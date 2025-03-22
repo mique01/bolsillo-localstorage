@@ -12,9 +12,9 @@ const resolveTxtPromise = promisify(dns.resolveTxt);
 
 // Supabase URLs to test
 const SUPABASE_URLS = [
-  'https://hrnmgtugsfcxkagjqqcq.supabase.co',
-  'https://corsproxy.io/?https://hrnmgtugsfcxkagjqqcq.supabase.co',
-  'https://api.allorigins.win/raw?url=https://hrnmgtugsfcxkagjqqcq.supabase.co'
+  'https://cxfnamwzbfrdaahfsqkc.supabase.co',
+  'https://corsproxy.io/?https://cxfnamwzbfrdaahfsqkc.supabase.c',
+  'https://api.allorigins.win/raw?url=https://cxfnamwzbfrdaahfsqkc.supabase.co'
 ];
 
 // Lista de proxy CORS que se pueden usar
@@ -121,7 +121,7 @@ async function runTests() {
   console.log('============================');
   
   // 1. Test de DNS
-  const dnsResult = await testDNS('hrnmgtugsfcxkagjqqcq.supabase.co');
+  const dnsResult = await testDNS('https://cxfnamwzbfrdaahfsqkc.supabase.co');
   
   // 2. Test de conexión HTTP directa
   console.log('\n=== TEST DE CONEXIÓN DIRECTA ===');
@@ -133,7 +133,7 @@ async function runTests() {
   console.log('\n=== TEST DE PROXIES CORS ===');
   const corsResults = [];
   for (const proxy of CORS_PROXIES) {
-    const result = await testCORSProxy(proxy, 'https://hrnmgtugsfcxkagjqqcq.supabase.co');
+    const result = await testCORSProxy(proxy, 'https://cxfnamwzbfrdaahfsqkc.supabase.co');
     if (result.success) {
       corsResults.push(result);
     }

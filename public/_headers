@@ -1,5 +1,6 @@
 /*
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-  Access-Control-Allow-Headers: X-Requested-With, Content-Type, Authorization
+  Access-Control-Allow-Headers: X-Requested-With, Content-Type, Authorization, X-Client-Info, X-Origin, X-Client-Environment, apikey
+  Access-Control-Allow-Credentials: true
   Cache-Control: public, max-age=3600 

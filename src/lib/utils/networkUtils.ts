@@ -30,10 +30,10 @@ export async function fetchWithRetry(
       ...options.headers,
       'X-Client-Environment': environment,
     },
-    // Always use CORS mode for Supabase requests
-    mode: 'cors',
-    // Include credentials for authenticated requests
-    credentials: 'include',
+    // Use no-cors mode for the first attempt if it's a GET request
+    mode: options.method === 'GET' ? 'no-cors' : 'cors',
+    // Don't include credentials for unauthenticated requests
+    credentials: 'omit',
   };
 
   // Try different fetch strategies based on retries remaining
@@ -47,15 +47,39 @@ export async function fetchWithRetry(
       if (attempt > 0) {
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         console.log(`Retry attempt ${attempt} for ${url}`);
+        
+        // For retry attempts, try different modes
+        if (attempt === 1) {
+          // Second attempt: Switch to CORS mode with credentials
+          fetchOptions.mode = 'cors';
+          fetchOptions.credentials = 'same-origin';
+        } else if (attempt >= 2) {
+          // Third attempt and beyond: Try CORS proxies
+          const corsProxies = [
+            "https://corsproxy.io/?",
+            "https://api.allorigins.win/raw?url="
+          ];
+          
+          // Use a CORS proxy for the URL
+          const proxyIndex = Math.min(attempt - 2, corsProxies.length - 1);
+          const targetUrl = `${corsProxies[proxyIndex]}${encodeURIComponent(url)}`;
+          
+          // Execute fetch with timeout using the proxy
+          const response = await fetch(targetUrl, {
+            ...fetchOptions,
+            // Reset these for proxy
+            mode: 'cors',
+            credentials: 'omit',
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
+          return response;
+        }
       }
 
-      // For last attempt, try CORS proxy if in browser environment
-      const targetUrl = attempt === retries - 1 && environment === 'github' && typeof window !== 'undefined'
-        ? `https://corsproxy.io/?${encodeURIComponent(url)}`
-        : url;
-
       // Execute fetch with timeout
-      const response = await fetch(targetUrl, {
+      const response = await fetch(url, {
         ...fetchOptions,
         signal: controller.signal,
       });
@@ -64,7 +88,7 @@ export async function fetchWithRetry(
       clearTimeout(timeoutId);
 
       // Log successful connection for debugging
-      if (response.ok) {
+      if (response.ok || response.type === 'opaque') {
         console.log(`Fetch successful for ${url} on attempt ${attempt + 1}`);
         
         // Store successful connection details if in browser

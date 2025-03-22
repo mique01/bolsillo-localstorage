@@ -56,8 +56,8 @@ const requestHeaders: Record<string, string> = {
 // Opciones para el fetch según el entorno
 const fetchOptions: RequestInit = {
   headers: requestHeaders,
-  // Usar 'cors' y 'include' para todos los entornos, no solo GitHub Pages
-  credentials: 'include' as RequestCredentials,
+  // Cambiar a 'same-origin' para evitar problemas de CORS
+  credentials: 'same-origin' as RequestCredentials,
   mode: 'cors' as RequestMode
 };
 
@@ -74,6 +74,7 @@ async function testUrl(url: string): Promise<boolean> {
       method: 'GET',
       mode: 'no-cors',
       cache: 'no-cache',
+      credentials: 'omit',
       headers: { 'Accept': 'application/json' }
     }, 2, 3000); // 2 intentos, 3 segundos de timeout
     
@@ -123,6 +124,8 @@ export const createSupabaseClient = async () => {
             {
               ...options,
               ...fetchOptions,
+              credentials: 'same-origin', // Cambiar a same-origin
+              mode: 'cors',
               headers: {
                 ...options.headers,
                 ...requestHeaders
@@ -150,6 +153,8 @@ export const createSupabaseClient = async () => {
           const response = await fetch(modifiedUrl, {
             ...options,
             ...fetchOptions,
+            credentials: 'same-origin', // Cambiar a same-origin
+            mode: 'cors',
             headers: {
               ...options.headers,
               ...requestHeaders
@@ -246,7 +251,7 @@ const supabase = createClient(
         // Añadir CORS y credentials a todas las peticiones
         return fetch(url, {
           ...options,
-          credentials: 'include',
+          credentials: 'same-origin',
           mode: 'cors',
           headers: {
             ...options?.headers,

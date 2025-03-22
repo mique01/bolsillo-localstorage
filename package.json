@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "postbuild": "node scripts/fix-duplicated-paths.js",
-    "start": "next start -p 3001",
+    "start": "next start -p 3002",
     "clean": "rimraf .next && rimraf node_modules/.cache && rimraf out",
     "lint": "next lint",
     "export": "next export",

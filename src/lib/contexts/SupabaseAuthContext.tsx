@@ -2,7 +2,10 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { SupabaseClient, User, Session } from '@supabase/supabase-js';
-import supabase from '../supabase';
+import supabase, { getSupabase } from '../supabase';
+
+// Import the reset instance function or declare a variable
+let supabaseInstance: any = null;
 
 interface SupabaseAuthContextType {
   user: User | null;
@@ -197,53 +200,55 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   };
 
   const signIn = async (email: string, password: string): Promise<void> => {
+    setIsLoading(true);
+    
     try {
-      setIsLoading(true);
+      // First check if we have connectivity issues
+      const useDirectIp = typeof window !== 'undefined' && 
+        localStorage.getItem('use_direct_ip') === 'true';
       
-      // Verificar si estamos offline
-      if (!isOnline) {
-        throw new Error('No hay conexión a internet. Intenta iniciar sesión cuando estés conectado.');
-      }
+      // Try to get a client with the right configuration
+      const client = await getSupabase();
       
-      // Intentar obtener la instancia asíncrona para mejor conectividad
-      let client = supabase;
-      try {
-        const asyncClient = await import('../supabase').then(module => module.getSupabase());
-        if (asyncClient) {
-          client = await asyncClient;
-          console.log("Usando cliente Supabase con múltiples reintentos");
-        }
-      } catch (error) {
-        console.warn("Error al cargar el cliente asíncrono:", error);
-      }
-      
-      // Crear un timeout para evitar que la petición se cuelgue indefinidamente
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Error de conexión con el servidor de autenticación. Verifica tu conexión a Internet.'));
-        }, 15000); // 15 segundos
+      // Use a more resilient sign-in approach
+      let { data, error } = await client.auth.signInWithPassword({
+        email,
+        password,
       });
       
-      // Intentar login con Supabase
-      const authPromise = client.auth.signInWithPassword({ email, password });
-      
-      // Usar Promise.race para manejar el timeout
-      const result = await Promise.race([authPromise, timeoutPromise]);
-      const { data, error } = result;
-      
       if (error) {
-        // Traducir mensajes de error comunes a español
-        if (error.message && error.message.includes('Invalid login credentials')) {
-          throw new Error('Credenciales inválidas. Verifica tu email y contraseña.');
-        } else if (error.message && error.message.includes('Email not confirmed')) {
-          throw new Error('Email no confirmado. Por favor, verifica tu bandeja de entrada.');
-        } else {
-          throw error;
+        if (error.message.includes('Failed to fetch') || 
+            error.message.includes('NetworkError') || 
+            error.message.includes('CORS')) {
+          
+          console.log("Trying alternative authentication method due to network issues");
+          
+          // Set direct IP mode and retry
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('use_direct_ip', 'true');
+          }
+          
+          // Get a fresh client with new settings
+          supabaseInstance = null;
+          const newClient = await getSupabase();
+          
+          // Retry the signin
+          const result = await newClient.auth.signInWithPassword({
+            email,
+            password,
+          });
+          
+          data = result.data;
+          error = result.error;
         }
       }
       
-      // Guardar información de sesión
-      setSession(data.session);
+      if (error) throw error;
+      
+      if (!data?.user) {
+        throw new Error('No user returned from Supabase');
+      }
+      
       setUser(data.user);
       setIsLoggedIn(true);
       
@@ -259,7 +264,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       
       // Intentar soluciones para problemas de conexión
       if (typeof window !== 'undefined' && error instanceof Error && 
-          (error.message.includes('fetch') || error.message.includes('ERR_NAME_NOT_RESOLVED'))) {
+          (error.message.includes('fetch') || error.message.includes('ERR_NAME_NOT_RESOLVED') || 
+           error.message.includes('NetworkError') || error.message.includes('CORS'))) {
         
         // Guardar información del error para diagnóstico
         localStorage.setItem('auth_error', JSON.stringify({
