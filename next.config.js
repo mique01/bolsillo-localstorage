@@ -29,7 +29,7 @@ const standardConfig = {
 // Aplicar la configuración correcta según el entorno
 const nextConfig = isGitHubPages
   ? { ...standardConfig, ...githubPagesConfig }
-  : standardConfig;
+  : { ...standardConfig, output: 'export' };
 
 // Configuración de webpack para ambos entornos
 nextConfig.webpack = (config, { isServer }) => {
