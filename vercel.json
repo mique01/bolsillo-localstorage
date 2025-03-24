@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install --no-package-lock --no-audit",
-  "buildCommand": "npm run build",
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm run build",
   "outputDirectory": "out",
   "framework": "nextjs",
   "nodeVersion": "18.x",

@@ -18,22 +18,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
-          
-      - name: Clear npm cache
-        run: npm cache clean --force
-        
-      - name: Delete node_modules and package-lock.json
-        run: |
-          rm -rf node_modules
-          rm -f package-lock.json
+          cache: 'pnpm'
           
       - name: Install dependencies
-        run: npm install --no-package-lock --no-audit
+        run: pnpm install --no-frozen-lockfile
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
         
@@ -41,10 +38,10 @@ jobs:
         run: cp .env.production .env.local
         
       - name: Install polyfills
-        run: npm install -D crypto-browserify stream-browserify
+        run: pnpm add -D crypto-browserify stream-browserify
 
       - name: Build application
-        run: npm run build
+        run: pnpm build
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
       

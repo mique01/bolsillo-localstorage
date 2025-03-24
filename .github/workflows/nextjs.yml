@@ -12,27 +12,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
+          cache: 'pnpm'
 
-      - name: Clear npm cache
-        run: npm cache clean --force
-
-      - name: Delete node_modules and package-lock.json
-        run: |
-          rm -rf node_modules
-          rm -f package-lock.json
-
-      - name: Install dependencies with clean install
-        run: npm install --no-package-lock --no-audit
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
 
       - name: Build application
-        run: npm run build
+        run: pnpm build
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
 
