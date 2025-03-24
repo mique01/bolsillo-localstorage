@@ -7,7 +7,7 @@
     "build": "next build",
     "postbuild": "node scripts/fix-duplicated-paths.js",
     "start": "next start -p 3002",
-    "clean": "rimraf .next && rimraf node_modules/.cache && rimraf out",
+    "clean": "rm -rf .next && rm -rf out && rm -rf node_modules/.cache",
     "lint": "next lint",
     "export": "next export",
     "deploy": "next build && touch out/.nojekyll && git add out/ && git commit -m \"Deploy to gh-pages\" && git subtree push --prefix out origin gh-pages",

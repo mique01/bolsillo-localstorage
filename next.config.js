@@ -11,8 +11,8 @@ const githubPagesConfig = {
     unoptimized: true, // No optimizar imágenes para evitar problemas con rutas
   },
   trailingSlash: true, // Añadir barras al final para compatibilidad con GitHub Pages
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/bolsilloapp-cursor' : '', // Ajustar según el nombre de tu repo
-  basePath: process.env.NODE_ENV === 'production' ? '/bolsilloapp-cursor' : '',
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/bolsilloapp-localstorage' : '', // Ajustar según el nombre de tu repo
+  basePath: process.env.NODE_ENV === 'production' ? '/bolsilloapp-localstorage' : '',
   distDir: 'out', // Directorio de salida para la compilación
 };
 
@@ -60,6 +60,14 @@ nextConfig.webpack = (config, { isServer }) => {
       })
     );
   }
+  
+  // Incrementar el tamaño de chunk para evitar errores de compilación
+  config.performance = {
+    ...config.performance,
+    maxEntrypointSize: 512000,
+    maxAssetSize: 512000
+  };
+  
   return config;
 };
 
@@ -84,6 +92,12 @@ nextConfig.headers = async () => {
       ],
     },
   ];
+};
+
+// Manejo de errores en tiempo de construcción
+nextConfig.onDemandEntries = {
+  maxInactiveAge: 25 * 1000,
+  pagesBufferLength: 5,
 };
 
 module.exports = nextConfig; 

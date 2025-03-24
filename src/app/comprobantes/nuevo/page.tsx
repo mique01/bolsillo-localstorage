@@ -140,7 +140,8 @@ export default function NuevoComprobantePage() {
       // Para imágenes, comprimir usando canvas
       const reader = new FileReader();
       reader.onload = (event) => {
-        const img = new Image();
+        // Crear elemento de imagen para cargar el archivo
+        const img = document.createElement('img');
         img.onload = () => {
           // Calcular dimensiones proporcionales para reducir tamaño
           let width = img.width;
