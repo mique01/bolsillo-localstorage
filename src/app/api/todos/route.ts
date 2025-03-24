@@ -1,56 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/app/lib/supabaseServer';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = createServerSupabaseClient();
-    
-    const { data, error } = await supabase
-      .from('todos')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    return NextResponse.json(data);
+    // In a real application, you would fetch todos from a database
+    // For now, we'll just return an empty array
+    return NextResponse.json({ data: [] });
   } catch (error) {
     console.error('Error fetching todos:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch todos' }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const supabase = createServerSupabaseClient();
-    
-    if (!body.title) {
+    const { title } = body;
+
+    if (!title) {
       return NextResponse.json(
-        { error: 'Title is required' }, 
+        { error: 'Title is required' },
         { status: 400 }
       );
     }
-    
-    const { data, error } = await supabase
-      .from('todos')
-      .insert({ 
-        title: body.title,
-        completed: body.completed || false,
-        user_id: body.user_id
-      })
-      .select();
-    
-    if (error) throw error;
-    
-    return NextResponse.json(data[0]);
+
+    // In a real application, you would save the todo to a database
+    // For now, we'll just return the todo
+    const todo = {
+      id: Date.now().toString(),
+      title,
+      completed: false,
+      created_at: new Date().toISOString()
+    };
+
+    return NextResponse.json({ data: todo });
   } catch (error) {
     console.error('Error creating todo:', error);
-    return NextResponse.json(
-      { error: 'Failed to create todo' }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 } 

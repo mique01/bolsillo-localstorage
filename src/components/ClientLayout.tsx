@@ -16,7 +16,7 @@ import {
   DollarSign,
   LifeBuoy,
 } from "lucide-react";
-import { SupabaseAuthProvider, useSupabaseAuth } from "@/lib/contexts/SupabaseAuthContext";
+import { useAuth } from "../lib/hooks/useAuth";
 import { DebugTool } from './DebugTool';
 
 // Componente simple de carga
@@ -60,37 +60,79 @@ const Navbar = ({
 // Sidebar simple
 const Sidebar = ({ showMenu }: { showMenu: boolean }) => {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
   
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { path: '/transacciones', label: 'Transacciones', icon: Receipt },
     { path: '/comprobantes', label: 'Comprobantes', icon: DollarSign },
     { path: '/presupuestos', label: 'Presupuestos', icon: PiggyBank },
+    { path: '/configuracion', label: 'Configuración', icon: Settings },
   ];
   
+  const handleLogout = () => {
+    signOut();
+    router.push('/login');
+  };
+
   return (
     <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 border-r border-gray-700 shadow-lg transform transition-all duration-300 pt-16
       ${showMenu ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
     >
-      <nav className="flex flex-col p-4 space-y-2">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                pathname === item.path
-                  ? "bg-gradient-to-r from-purple-600/30 to-indigo-600/20 text-white border border-purple-500/30"
-                  : "text-gray-400 hover:bg-gray-700 hover:text-white"
-              }`}
-            >
-              <Icon size={20} className="mr-3" />
-              <span className="text-sm font-medium">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex flex-col h-full">
+        {/* User Profile Section */}
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gray-700 rounded-full">
+              <User size={20} className="text-gray-300" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">{user?.username}</p>
+              <p className="text-xs text-gray-400">{user?.profileType || 'Personal'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.path;
+            
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                  isActive
+                    ? "bg-gradient-to-r from-purple-600/30 to-indigo-600/20 text-white border border-purple-500/30"
+                    : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
+                }`}
+              >
+                <Icon size={20} className={`mr-3 transition-colors ${
+                  isActive ? 'text-purple-400' : 'text-gray-400 group-hover:text-white'
+                }`} />
+                <span className="text-sm font-medium">{item.label}</span>
+                {isActive && (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-purple-400" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Section */}
+        <div className="p-4 border-t border-gray-700">
+          <button
+            onClick={handleLogout}
+            className="flex items-center w-full px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+          >
+            <LogOut size={20} className="mr-3" />
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -144,18 +186,18 @@ export const CustomLink = ({ href, ...props }: React.ComponentProps<typeof Link>
 function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, isLoggedIn, isLoading } = useSupabaseAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [showConnectionDebug, setShowConnectionDebug] = useState(false);
+  const { user, signOut, loading } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const isPublicRoute = ['/login', '/register', '/reset-password'].includes(pathname);
 
-  // Definir rutas públicas que no requieren autenticación
-  const authPaths = ['/login', '/reset-password'];
-
+  // Handle mobile detection
   useEffect(() => {
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) {
+        setShowMenu(false);
+      }
     };
     
     checkIfMobile();
@@ -166,89 +208,65 @@ function Layout({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Close menu when route changes
   useEffect(() => {
-    // Detect network errors that might indicate connection problems
-    const hasConnectionErrors = localStorage.getItem('auth_error') !== null;
-    
-    // Show connection debug after multiple errors
-    if (hasConnectionErrors) {
-      const errorData = JSON.parse(localStorage.getItem('auth_error') || '{}');
-      const errorTime = new Date(errorData.timestamp || 0);
-      const now = new Date();
-      
-      // Only show debug button if error happened in the last hour
-      if (now.getTime() - errorTime.getTime() < 60 * 60 * 1000) {
-        setShowConnectionDebug(true);
-      }
-    }
-  }, []);
+    setShowMenu(false);
+  }, [pathname]);
 
+  // Handle auth redirect - debe estar AQUÍ para evitar problemas de hooks renderizados inconsistentemente
+  useEffect(() => {
+    if (!loading && !user && !isPublicRoute && typeof window !== 'undefined') {
+      router.push('/login');
+    }
+  }, [user, loading, isPublicRoute, router, pathname]);
+
+  // Handle logout
   const handleLogout = async () => {
-    await signOut();
-    router.push(getFullPath('/login'));
+    signOut();
+    router.push('/login');
   };
 
-  // Skip rendering sidebar and header for login/register pages
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  const loginPath = '/login';
-  const resetPath = '/reset-password';
+  // Show loading screen while checking auth
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
-  if (pathname === loginPath || pathname === resetPath || 
-      (basePath && (pathname === `${basePath}${loginPath}` || pathname === `${basePath}${resetPath}`))) {
+  // Durante la verificación, mostrar carga
+  if (!user && !isPublicRoute) {
+    return <LoadingScreen />;
+  }
+
+  // Don't show layout on public routes
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 
-  // Mostrar loading mientras se carga la sesión
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-
-  // Si no está autenticado y no es una página de autenticación, redireccionar a login
-  if (!isLoggedIn && !authPaths.includes(pathname || '')) {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-    return <LoadingScreen />;
-  }
-
   return (
-    <MainLayout>
-      <Navbar showMenu={showMenu} setShowMenu={setShowMenu} />
-      <div className="flex h-screen pt-16">
-        <Sidebar showMenu={showMenu} />
-        <main className="flex-1 p-4 lg:p-8 overflow-auto ml-0 md:ml-64">{children}</main>
-      </div>
-      
-      {/* Connection debug tool */}
-      {showConnectionDebug && (
-        <button 
-          onClick={() => window.location.href = '/login?show_diagnostics=true'}
-          className="fixed bottom-4 left-4 z-50 bg-indigo-700 hover:bg-indigo-800 text-white rounded-full p-2.5 shadow-lg"
-          title="Solucionar problemas de conexión"
-        >
-          <LifeBuoy size={20} />
-        </button>
+    <div className="min-h-screen bg-gray-900">
+      {/* Overlay for mobile menu */}
+      {showMenu && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={() => setShowMenu(false)}
+        />
       )}
       
-      {/* Debug Tool */}
-      <DebugTool />
+      {/* Navbar */}
+      <Navbar showMenu={showMenu} setShowMenu={setShowMenu} />
       
-      {/* Settings */}
-      <Link
-        href="/configuracion"
-        className="fixed bottom-16 left-4 z-50 bg-gray-700 hover:bg-gray-800 text-white rounded-full p-2.5 shadow-lg"
-        title="Configuración"
-      >
-        <Settings size={20} />
-      </Link>
-    </MainLayout>
+      {/* Main Layout */}
+      <div className="flex min-h-screen pt-16">
+        <Sidebar showMenu={showMenu} />
+        <main className="flex-1 p-4 md:p-8 transition-all duration-300 md:ml-64">
+          <div className="max-w-6xl mx-auto">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
   );
 }
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <SupabaseAuthProvider>
-      <Layout>{children}</Layout>
-    </SupabaseAuthProvider>
-  );
+  return <Layout>{children}</Layout>;
 } 

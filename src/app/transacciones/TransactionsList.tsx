@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -18,8 +18,7 @@ import {
   Trash
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { useSupabaseAuth } from '@/lib/contexts/SupabaseAuthContext';
-import { deleteTransaction } from '@/lib/services/supabaseDatabase';
+import { useAuth } from '../../lib/hooks/useAuth';
 
 interface Transaction {
   id: string;
@@ -32,11 +31,12 @@ interface Transaction {
   person?: string;
   receipt_id?: string | null;
   created_at: string;
+  userId: string;
 }
 
 export default function TransactionsList() {
-  const { user } = useSupabaseAuth();
   const router = useRouter();
+  const { user } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,58 +61,49 @@ export default function TransactionsList() {
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   
   // Aplicar filtros a las transacciones
-  const applyFilters = (transactionsToFilter: Transaction[]): Transaction[] => {
-    return transactionsToFilter.filter((transaction) => {
-      // Filtrar por término de búsqueda
-      const matchesSearch = searchTerm === '' || 
-        transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.payment_method.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Filtrar por categoría
-      const matchesCategory = selectedCategory === '' || transaction.category === selectedCategory;
-      
-      // Filtrar por tipo
-      const matchesType = selectedType === '' || selectedType === 'all' || transaction.type === selectedType;
-      
-      // Filtrar por persona
-      const matchesPerson = selectedPerson === '' || transaction.person === selectedPerson;
-      
-      // Filtrar por fecha
-      let matchesDate = true;
-      if (dateRange !== '') {
-        const transactionDate = new Date(transaction.date);
-        const today = new Date();
-        const daysAgo = (days: number) => new Date(today.getTime() - days * 24 * 60 * 60 * 1000);
-        
-        switch (dateRange) {
-          case 'today':
-            matchesDate = transactionDate.toDateString() === today.toDateString();
-            break;
-          case 'week':
-            matchesDate = transactionDate >= daysAgo(7);
-            break;
-          case 'month':
-            matchesDate = transactionDate >= daysAgo(30);
-            break;
-          case 'year':
-            matchesDate = transactionDate >= daysAgo(365);
-            break;
-          default:
-            // Si dateRange es un valor de mes (YYYY-MM)
-            if (dateRange.match(/^\d{4}-\d{2}$/)) {
-              const [year, month] = dateRange.split('-').map(Number);
-              const transactionYear = transactionDate.getFullYear();
-              const transactionMonth = transactionDate.getMonth() + 1; // getMonth() retorna 0-11
-              matchesDate = transactionYear === year && transactionMonth === month;
-            }
-            break;
-        }
-      }
-      
-      return matchesSearch && matchesCategory && matchesType && matchesPerson && matchesDate;
-    });
-  };
+  const applyFilters = useCallback(() => {
+    let filtered = [...transactions];
+
+    // Apply type filter
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(t => t.type === selectedType);
+    }
+
+    // Apply date filter
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+
+    if (dateRange === 'today') {
+      filtered = filtered.filter(t => new Date(t.date) >= today);
+    } else if (dateRange === 'week') {
+      filtered = filtered.filter(t => new Date(t.date) >= weekAgo);
+    } else if (dateRange === 'month') {
+      filtered = filtered.filter(t => new Date(t.date) >= monthAgo);
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter((t) => 
+        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.payment_method.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply category filter
+    if (selectedCategory) {
+      filtered = filtered.filter(t => t.category === selectedCategory);
+    }
+
+    // Apply person filter
+    if (selectedPerson) {
+      filtered = filtered.filter(t => t.person === selectedPerson);
+    }
+
+    setFilteredTransactions(filtered);
+  }, [selectedType, dateRange, searchTerm, selectedCategory, selectedPerson, transactions]);
   
   // Actualizar listas únicas cuando cambian las transacciones
   useEffect(() => {
@@ -141,44 +132,32 @@ export default function TransactionsList() {
     setPaymentMethods(uniqueMethods);
     
     // Aplicar filtros iniciales
-    setFilteredTransactions(applyFilters(transactions));
-  }, [transactions]);
+    applyFilters();
+  }, [transactions, applyFilters]);
   
   // Cargar transacciones
   useEffect(() => {
-    const loadTransactions = async () => {
-      setLoading(true);
-      
-      try {
-        if (typeof window !== 'undefined') {
-          const storedTransactions = localStorage.getItem('transactions');
-          
-          if (storedTransactions) {
-            const parsedTransactions = JSON.parse(storedTransactions);
-            console.log('Transacciones cargadas:', parsedTransactions);
-            setTransactions(parsedTransactions);
-          } else {
-            console.log('No hay transacciones almacenadas');
-            setTransactions([]);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading transactions:', err);
-        setError('Error al cargar las transacciones');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadTransactions();
-  }, []);
+    if (!user) {
+      router.push('/login');
+      return;
+    }
 
-  // Filtrar transacciones cuando cambien los filtros
+    // Load transactions from localStorage
+    const storedTransactions = localStorage.getItem('transactions');
+    if (storedTransactions) {
+      const parsedTransactions = JSON.parse(storedTransactions);
+      console.log('Transacciones cargadas:', parsedTransactions);
+      setTransactions(parsedTransactions.filter((t: Transaction) => t.userId === user.id));
+    } else {
+      console.log('No hay transacciones almacenadas');
+      setTransactions([]);
+    }
+    setLoading(false);
+  }, [user, router]);
+
   useEffect(() => {
-    const filtered = applyFilters(transactions);
-    console.log('Transacciones filtradas:', filtered.length);
-    setFilteredTransactions(filtered);
-  }, [transactions, selectedType, selectedCategory, selectedPerson, dateRange, searchTerm]);
+    applyFilters();
+  }, [applyFilters]);
 
   // Manejar eliminación de transacción
   const handleDeleteTransaction = (id: string) => {

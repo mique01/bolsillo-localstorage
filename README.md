@@ -4,7 +4,6 @@ Una aplicación web moderna para gestionar tus finanzas personales, con seguimie
 
 ## Características
 
-- 🔐 Autenticación de usuarios con Supabase
 - 💰 Registro de ingresos y gastos
 - 📊 Dashboard con gráficos y estadísticas
 - 📃 Gestión de comprobantes y archivos
@@ -16,7 +15,6 @@ Una aplicación web moderna para gestionar tus finanzas personales, con seguimie
 ### Requisitos previos
 
 - Node.js (versión 16.x o superior)
-- Cuenta en [Supabase](https://supabase.com) (gratuita)
 
 ### Instalación
 
@@ -31,138 +29,99 @@ cd bolsillo-app
 npm install
 ```
 
-3. Crea un archivo `.env.local` con las siguientes variables:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-clave-anon-key
-```
-
-4. Ejecuta la aplicación en modo desarrollo
+3. Ejecuta la aplicación en modo desarrollo
 ```bash
 npm run dev
 ```
 
-### Configuración de Supabase
+### Estructura de datos
 
-1. Crea una cuenta gratuita en [Supabase](https://supabase.com)
-2. Crea un nuevo proyecto
-3. Anota la URL del proyecto y la Anon Key desde: Configuración del proyecto > API
-4. Crea las siguientes tablas en la base de datos:
+La aplicación utiliza localStorage para almacenar los siguientes datos:
 
-#### Estructura de la base de datos
+#### Transacciones
+```typescript
+interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+  type: 'income' | 'expense';
+  paymentMethod: string;
+  person?: string;
+  attachmentId?: string;
+  createdAt: string;
+}
+```
 
-##### Tabla: `transactions`
-- `id` (uuid, PK, defaultValue: `uuid_generate_v4()`)
-- `user_id` (uuid, FK references auth.users.id, not null)
-- `description` (text, not null)
-- `amount` (numeric, not null)
-- `date` (date, not null)
-- `category` (text, not null)
-- `type` (text, not null) - Valores: 'income' o 'expense'
-- `payment_method` (text, not null)
-- `person` (text)
-- `attachment_id` (uuid, FK references comprobantes.id)
-- `created_at` (timestamp with time zone, defaultValue: `now()`)
+#### Categorías
+```typescript
+interface Category {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  createdAt: string;
+}
+```
 
-##### Tabla: `categories`
-- `id` (uuid, PK, defaultValue: `uuid_generate_v4()`)
-- `user_id` (uuid, FK references auth.users.id, not null)
-- `name` (text, not null)
-- `type` (text, not null) - Valores: 'income' o 'expense'
-- `created_at` (timestamp with time zone, defaultValue: `now()`)
+#### Métodos de pago
+```typescript
+interface PaymentMethod {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+```
 
-##### Tabla: `payment_methods`
-- `id` (uuid, PK, defaultValue: `uuid_generate_v4()`)
-- `user_id` (uuid, FK references auth.users.id, not null)
-- `name` (text, not null)
-- `created_at` (timestamp with time zone, defaultValue: `now()`)
+#### Personas
+```typescript
+interface Person {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+```
 
-##### Tabla: `people`
-- `id` (uuid, PK, defaultValue: `uuid_generate_v4()`)
-- `user_id` (uuid, FK references auth.users.id, not null)
-- `name` (text, not null)
-- `created_at` (timestamp with time zone, defaultValue: `now()`)
+#### Carpetas
+```typescript
+interface Folder {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+```
 
-##### Tabla: `folders`
-- `id` (uuid, PK, defaultValue: `uuid_generate_v4()`)
-- `user_id` (uuid, FK references auth.users.id, not null)
-- `name` (text, not null)
-- `created_at` (timestamp with time zone, defaultValue: `now()`)
+#### Comprobantes
+```typescript
+interface Receipt {
+  id: string;
+  description: string;
+  fileName: string;
+  fileType: string;
+  fileUrl: string;
+  folderId?: string;
+  transactionId?: string;
+  createdAt: string;
+}
+```
 
-##### Tabla: `comprobantes`
-- `id` (uuid, PK, defaultValue: `uuid_generate_v4()`)
-- `user_id` (uuid, FK references auth.users.id, not null)
-- `description` (text, not null)
-- `file_name` (text, not null)
-- `file_type` (text, not null)
-- `file_url` (text, not null)
-- `folder_id` (uuid, FK references folders.id)
-- `transaction_id` (uuid, FK references transactions.id)
-- `created_at` (timestamp with time zone, defaultValue: `now()`)
-
-##### Tabla: `budgets`
-- `id` (uuid, PK, defaultValue: `uuid_generate_v4()`)
-- `user_id` (uuid, FK references auth.users.id, not null)
-- `category` (text, not null)
-- `amount` (numeric, not null)
-- `period` (text, not null) - Valores: 'monthly' o 'yearly'
-- `created_at` (timestamp with time zone, defaultValue: `now()`)
-
-### Políticas de seguridad (RLS)
-
-Para cada tabla, establece las siguientes políticas de Row Level Security:
-
-1. Habilita RLS en todas las tablas
-2. Para cada tabla, crea las siguientes políticas:
-
-#### Política SELECT (para todas las tablas)
-- Nombre: `Users can view their own data`
-- Objetivo: `SELECT`
-- Expresión de verificación: `auth.uid() = user_id`
-
-#### Política INSERT (para todas las tablas)
-- Nombre: `Users can insert their own data`
-- Objetivo: `INSERT`
-- Expresión de verificación: `auth.uid() = user_id`
-
-#### Política UPDATE (para todas las tablas)
-- Nombre: `Users can update their own data`
-- Objetivo: `UPDATE`
-- Expresión de verificación: `auth.uid() = user_id`
-
-#### Política DELETE (para todas las tablas)
-- Nombre: `Users can delete their own data`
-- Objetivo: `DELETE`
-- Expresión de verificación: `auth.uid() = user_id`
-
-### Configuración de almacenamiento
-
-1. Crea un nuevo bucket llamado `comprobantes`
-2. Habilita RLS en el bucket
-3. Crea las siguientes políticas:
-
-#### SELECT para archivos
-- Nombre: `Users can view their own files`
-- Objetivo: `SELECT`
-- Expresión de verificación: `auth.uid()::text = SPLIT_PART(name, '/', 1)`
-
-#### INSERT para archivos
-- Nombre: `Users can upload their own files`
-- Objetivo: `INSERT`
-- Expresión de verificación: `auth.uid()::text = SPLIT_PART(name, '/', 1)`
-
-#### UPDATE/DELETE para archivos
-- Nombre: `Users can update/delete their own files`
-- Objetivo: `UPDATE, DELETE`
-- Expresión de verificación: `auth.uid()::text = SPLIT_PART(name, '/', 1)`
+#### Presupuestos
+```typescript
+interface Budget {
+  id: string;
+  category: string;
+  amount: number;
+  period: 'monthly' | 'yearly';
+  createdAt: string;
+}
+```
 
 ## Uso
 
-1. Regístrate o inicia sesión en la aplicación
-2. Navega al dashboard para ver un resumen de tus finanzas
-3. Agrega nuevas transacciones desde la sección de Transacciones
-4. Gestiona tus comprobantes en la sección Comprobantes
-5. Establece presupuestos en la sección Presupuestos
+1. Navega al dashboard para ver un resumen de tus finanzas
+2. Agrega nuevas transacciones desde la sección de Transacciones
+3. Gestiona tus comprobantes en la sección Comprobantes
+4. Establece presupuestos en la sección Presupuestos
 
 ## Desarrollo
 
@@ -172,9 +131,9 @@ Para cada tabla, establece las siguientes políticas de Row Level Security:
 - `/src/app/api`: Rutas de API
 - `/src/components`: Componentes React reutilizables
 - `/src/lib`: Utilidades, hooks y contextos
-  - `/contexts`: Contextos de React (Auth, etc.)
+  - `/contexts`: Contextos de React
   - `/hooks`: Hooks personalizados
-  - `/services`: Servicios para comunicación con Supabase
+  - `/services`: Servicios para manejo de datos locales
 
 ### Scripts disponibles
 

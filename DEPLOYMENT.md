@@ -1,6 +1,6 @@
 # Deployment Guide for BolsilloApp
 
-This document outlines how to deploy BolsilloApp to both GitHub Pages and Vercel, including important details about environment detection, authentication handling, and common issues.
+This document outlines how to deploy BolsilloApp to both GitHub Pages and Vercel, including important details about environment detection and common issues.
 
 ## Environment Detection
 
@@ -13,64 +13,46 @@ The application includes environment detection logic that adjusts configurations
 Environment detection is implemented in multiple places:
 
 1. `src/lib/utils/networkUtils.ts` - Detects environment for network requests
-2. `src/lib/supabase.ts` - Configures Supabase client based on environment
-3. `next.config.js` - Sets build options based on environment
+2. `next.config.js` - Sets build options based on environment
 
-## Authentication Flow
+## Data Storage
 
-The application uses Supabase for authentication. The flow works as follows:
+The application uses localStorage for data persistence. The data structure is defined in the README.md file.
 
-1. User enters credentials on the login page
-2. Request is made to Supabase authentication API
-3. On success, JWT token is stored in local storage
-4. `SupabaseAuthContext` maintains the authentication state
-5. Protected routes check authentication state
+### Data Management
 
-### Handling Authentication Errors
-
-When authentication fails, the application:
-
-1. Detects errors using the enhanced network utils
-2. Attempts to retry with exponential backoff
-3. Falls back to alternative connection methods if needed
-4. Provides user-friendly error messages
+1. All data is stored locally in the browser's localStorage
+2. Data is automatically loaded when the application starts
+3. Changes are immediately persisted to localStorage
+4. Data is structured according to the interfaces defined in the README
 
 ## Deployment Steps
 
 ### GitHub Pages
 
 1. Configure the GitHub workflow in `.github/workflows/deploy.yml`
-2. Ensure environment variables are set in GitHub repository secrets:
-   - `NEXT_PUBLIC_SUPABASE_URL`  
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_SUPABASE_STORAGE_URL`
-3. Push to the main branch to trigger deployment
+2. Push to the main branch to trigger deployment
 
 ### Vercel
 
 1. Connect your GitHub repository to Vercel
-2. Configure environment variables in the Vercel dashboard
-3. Set the following variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_SUPABASE_STORAGE_URL`
-4. Deploy from the Vercel dashboard or push to the main branch
+2. Deploy from the Vercel dashboard or push to the main branch
 
 ## Common Issues and Solutions
 
-### Authentication Issues (`AuthRetryableFetchError`)
+### localStorage Issues
 
 This error typically appears when:
 
-1. The application can't connect to Supabase's authentication servers
-2. CORS policies are blocking the authentication request
-3. Network connectivity issues are present
+1. The browser's localStorage is disabled
+2. The browser is in private/incognito mode
+3. The browser's storage quota is exceeded
 
 **Solutions:**
 
-- The application includes built-in retry logic and fallbacks
+- The application includes built-in error handling for localStorage operations
 - Enhanced error messages provide clarity to users
-- Network diagnostic tools help identify the source of the problem
+- The ConnectionManager component shows storage availability status
 
 ### Missing Polyfills
 
@@ -81,19 +63,8 @@ When deploying, you might encounter errors related to missing Node.js modules in
 - The webpack configuration in `next.config.js` includes necessary polyfills
 - Additional polyfills can be added as needed
 
-### CORS Issues
-
-Cross-Origin Resource Sharing issues might appear when accessing Supabase from GitHub Pages:
-
-**Solution:**
-
-- The application includes CORS headers in `next.config.js`
-- A public `_headers` file configures additional CORS settings
-- The enhanced fetch function in `networkUtils.ts` includes CORS-friendly headers
-
 ## Additional Resources
 
-- Check `scripts/connection-test.js` to run connectivity diagnostics
 - Use `npm run analyze` to identify bundle size issues
 - Review `scripts/fix-duplicated-paths.js` if you encounter path-related deployment issues
 

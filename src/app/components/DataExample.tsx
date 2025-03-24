@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { fetchData, createRecord } from '@/app/lib/supabaseData.js';
 
 interface Todo {
   id: number;
@@ -18,42 +17,15 @@ export default function DataExample() {
     loadTodos();
   }, []);
 
-  async function loadTodos() {
+  function loadTodos() {
     setLoading(true);
     try {
-      const response = await fetchData('todos', {
-        orderBy: { column: 'created_at', ascending: false },
-      });
-      
-      if (response.error) {
-        console.error('Error loading todos:', response.error);
-        setTodos([]);
-        return;
-      }
-      
-      // Safe type check and conversion
-      if (response.data && Array.isArray(response.data)) {
-        // We need to manually validate each item
-        const safeData: Todo[] = [];
-        
-        for (const item of response.data) {
-          if (item && 
-              typeof item === 'object' && 
-              'id' in item && 
-              'title' in item && 
-              'completed' in item) {
-            safeData.push({
-              id: Number((item as any).id),
-              title: String((item as any).title),
-              completed: Boolean((item as any).completed),
-              user_id: String((item as any).user_id || '')
-            });
-          }
+      const storedTodos = localStorage.getItem('todos');
+      if (storedTodos) {
+        const parsedTodos = JSON.parse(storedTodos);
+        if (Array.isArray(parsedTodos)) {
+          setTodos(parsedTodos);
         }
-        
-        setTodos(safeData);
-      } else {
-        setTodos([]);
       }
     } catch (error) {
       console.error('Error loading todos:', error);
@@ -63,41 +35,21 @@ export default function DataExample() {
     }
   }
 
-  async function handleAddTodo(e: React.FormEvent) {
+  function handleAddTodo(e: React.FormEvent) {
     e.preventDefault();
     if (!newTodo.trim()) return;
     
     try {
-      const response = await createRecord('todos', {
+      const newTodoItem: Todo = {
+        id: Date.now(), // Using timestamp as ID
         title: newTodo,
         completed: false,
-      });
+        user_id: 'local-user' // Since we're using localStorage, we'll use a static user ID
+      };
       
-      if (response.error) {
-        console.error('Error adding todo:', response.error);
-        return;
-      }
-      
-      // Manually extract and validate the new todo
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        const item = response.data[0] as any;
-        
-        if (item && 
-            typeof item === 'object' && 
-            'id' in item && 
-            'title' in item) {
-          
-          const newTodo: Todo = {
-            id: Number(item.id),
-            title: String(item.title),
-            completed: Boolean(item.completed || false),
-            user_id: String(item.user_id || '')
-          };
-          
-          setTodos(prev => [newTodo, ...prev]);
-        }
-      }
-      
+      const updatedTodos = [newTodoItem, ...todos];
+      localStorage.setItem('todos', JSON.stringify(updatedTodos));
+      setTodos(updatedTodos);
       setNewTodo('');
     } catch (error) {
       console.error('Error adding todo:', error);

@@ -1,104 +1,191 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Upload, X, Check, ArrowLeft, Image as ImageIcon } from 'lucide-react';
-import { addComprobante } from '@/lib/services/supabaseDatabase';
-import { useSupabaseAuth } from '@/lib/contexts/SupabaseAuthContext';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../../../lib/hooks/useAuth';
+import { Upload, Loader2, X, FileText, Image, File, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import ProtectedRoute from '../../components/ProtectedRoute';
 
-function NuevoComprobanteContent() {
-  const { user } = useSupabaseAuth();
+interface Folder {
+  id: string;
+  userId: string;
+  name: string;
+  createdAt: string;
+}
+
+export default function NuevoComprobantePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const transactionId = searchParams.get('transactionId');
-  
-  // Estados para el formulario
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [date, setDate] = useState('');
-  const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [description, setDescription] = useState('');
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  
-  // Cargar detalles de la transacción si se proporciona un ID
+
   useEffect(() => {
-    if (transactionId) {
-      const fetchTransactionDetails = async () => {
-        try {
-          const storedTransactions = localStorage.getItem('transactions');
-          if (storedTransactions) {
-            const parsedTransactions = JSON.parse(storedTransactions);
-            const transaction = parsedTransactions.find((t: any) => t.id === transactionId);
-            
-            if (transaction) {
-              setTransactionDetails(transaction);
-              setDescription(transaction.description || '');
-              setDate(transaction.date || new Date().toISOString().split('T')[0]);
-              setCategory(transaction.category || '');
-            }
-          }
-        } catch (error) {
-          console.error('Error al cargar la transacción:', error);
-        }
-      };
-      
-      fetchTransactionDetails();
-    } else {
-      // Si no hay transacción, establecer la fecha actual
-      setDate(new Date().toISOString().split('T')[0]);
+    if (!user) return;
+    
+    // Load folders from localStorage
+    const storedFolders = localStorage.getItem('folders');
+    if (storedFolders) {
+      const parsedFolders = JSON.parse(storedFolders);
+      const userFolders = parsedFolders.filter((folder: Folder) => folder.userId === user.id);
+      setFolders(userFolders);
     }
-  }, [transactionId]);
-  
-  // Manejar la selección de archivos
+  }, [user]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
+    const selectedFiles = e.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) {
+      return;
+    }
+
+    const selectedFile = selectedFiles[0];
+    setFile(selectedFile);
+
+    // Validate file type
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!validTypes.includes(selectedFile.type)) {
+      setError('Tipo de archivo no válido. Solo se permiten PDF, JPEG, JPG y PNG.');
+      return;
+    }
+
+    // Create preview for images only
+    if (selectedFile.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    } else {
+      // For PDFs or other files, just show icon
+      setFilePreview(null);
+    }
+    
+    setError(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
       
-      // Validar tipo de archivo (imágenes y PDF)
-      const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-      if (!validTypes.includes(selectedFile.type)) {
-        setError('Solo se permiten archivos JPG, PNG o PDF');
+      // Validate file type
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!validTypes.includes(droppedFile.type)) {
+        setError('Tipo de archivo no válido. Solo se permiten PDF, JPEG, JPG y PNG.');
         return;
       }
       
-      // Validar tamaño (máximo 5MB)
-      if (selectedFile.size > 5 * 1024 * 1024) {
-        setError('El archivo no debe superar los 5MB');
-        return;
-      }
+      setFile(droppedFile);
       
-      setFile(selectedFile);
-      setError(null);
-      
-      // Generar preview para imágenes
-      if (selectedFile.type.startsWith('image/')) {
+      // Preview for images
+      if (droppedFile.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = () => {
-          setPreviewUrl(reader.result as string);
+          setFilePreview(reader.result as string);
         };
-        reader.readAsDataURL(selectedFile);
+        reader.readAsDataURL(droppedFile);
       } else {
-        // Para PDFs mostramos un ícono
-        setPreviewUrl(null);
+        setFilePreview(null);
       }
+      
+      setError(null);
     }
   };
-  
-  // Eliminar el archivo seleccionado
+
   const handleRemoveFile = () => {
     setFile(null);
-    setPreviewUrl(null);
-    // Resetear el input file
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
+    setFilePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
-  
-  // Enviar el formulario
+
+  const getFileIcon = () => {
+    if (!file) return null;
+    
+    if (file.type === 'application/pdf') {
+      return <FileText className="text-red-400" size={48} />;
+    } else if (file.type.startsWith('image/')) {
+      return <Image className="text-blue-400" size={48} />;
+    } else {
+      return <File className="text-gray-400" size={48} />;
+    }
+  };
+
+  // Función para comprimir una imagen
+  const compressImage = async (file: File, quality: number = 0.6, maxWidth: number = 1200): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Si no es una imagen, simplemente leer como base64
+      if (!file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // Para imágenes, comprimir usando canvas
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Calcular dimensiones proporcionales para reducir tamaño
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxWidth) {
+            const ratio = maxWidth / width;
+            width = maxWidth;
+            height = height * ratio;
+          }
+
+          // Crear canvas y dibujar la imagen con las nuevas dimensiones
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('No se pudo obtener el contexto del canvas'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convertir a base64 con la calidad especificada
+          // Para JPEG y PNG usamos el formato original
+          // Para otros formatos usamos JPEG como fallback
+          const format = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const dataUrl = canvas.toDataURL(format, quality);
+          
+          resolve(dataUrl);
+        };
+        
+        img.onerror = () => {
+          reject(new Error('Error al cargar la imagen para compresión'));
+        };
+        
+        img.src = event.target?.result as string;
+      };
+      
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -106,260 +193,252 @@ function NuevoComprobanteContent() {
       setError('Debes iniciar sesión para subir comprobantes');
       return;
     }
-    
+
     if (!file) {
-      setError('Debes seleccionar un archivo');
+      setError('Por favor selecciona un archivo');
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      // Crear objeto de comprobante
-      const newReceipt = {
-        user_id: user.id,
-        description: description || file.name,
-        file_name: file.name,
-        file_type: file.type,
-        file_url: '', // Se llenará en la función addComprobante
-        folder_id: '', // Valor por defecto, se puede cambiar si hay carpetas
-        date: date || new Date().toISOString().split('T')[0],
-        transaction_id: transactionId || null,
-      };
+      // Read file data as base64 with compression for images
+      let fileData;
       
-      // Guardar en Supabase
-      const { data, error: uploadError } = await addComprobante(newReceipt, file);
-      
-      if (uploadError) {
-        throw new Error(uploadError.message);
+      try {
+        // Intentar comprimir con calidad media primero
+        fileData = await compressImage(file, 0.6);
+      } catch (compressionError) {
+        console.error('Error compressing image:', compressionError);
+        // Fallar con gracia, intentar leer el archivo original
+        fileData = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
       }
+
+      const newComprobante = {
+        id: Date.now().toString(),
+        userId: user.id,
+        filename: file.name,
+        fileType: file.type,
+        fileData: fileData,
+        folderId: selectedFolder,
+        description: description || null,
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      };
+
+      // Get existing comprobantes from localStorage
+      const existingComprobantes = JSON.parse(localStorage.getItem('comprobantes') || '[]');
       
-      // También guardamos en localStorage para desarrollo
-      const storedReceipts = localStorage.getItem('comprobantes');
-      const receipts = storedReceipts ? JSON.parse(storedReceipts) : [];
-      receipts.push(newReceipt);
-      localStorage.setItem('comprobantes', JSON.stringify(receipts));
-      
-      // Si hay una transacción asociada, actualizarla
-      if (transactionId) {
-        const storedTransactions = localStorage.getItem('transactions');
-        if (storedTransactions) {
-          const transactions = JSON.parse(storedTransactions);
-          const updatedTransactions = transactions.map((t: any) => 
-            t.id === transactionId 
-              ? { ...t, receipt_id: Date.now().toString() }
-              : t
+      try {
+        // Intentar guardar en localStorage
+        localStorage.setItem('comprobantes', JSON.stringify([...existingComprobantes, newComprobante]));
+        router.push('/comprobantes');
+      } catch (storageError) {
+        // Si ocurre un error QuotaExceededError, intentar comprimir más o limpiar
+        if (storageError instanceof DOMException && 
+            (storageError.name === 'QuotaExceededError' || storageError.code === 22)) {
+          
+          setError('El archivo es demasiado grande. Intentando comprimir más...');
+          
+          // Si es una imagen, intentar con mayor compresión
+          if (file.type.startsWith('image/')) {
+            try {
+              // Comprimir con calidad baja y dimensiones menores
+              const compressedData = await compressImage(file, 0.3, 800);
+              
+              // Actualizar el comprobante con datos comprimidos
+              newComprobante.fileData = compressedData;
+              
+              // Intentar guardar de nuevo
+              localStorage.setItem('comprobantes', JSON.stringify([...existingComprobantes, newComprobante]));
+              setError(null);
+              router.push('/comprobantes');
+              return;
+            } catch (compressError) {
+              console.error('Error with higher compression:', compressError);
+            }
+          }
+          
+          // Si la compresión adicional no funciona o no es una imagen, 
+          // eliminar comprobantes antiguos
+          setError('El almacenamiento está lleno. Eliminando algunos archivos antiguos para hacer espacio...');
+          
+          // Ordenar comprobantes por fecha (los más antiguos primero)
+          const sortedComprobantes = [...existingComprobantes].sort((a, b) => 
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
-          localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+          
+          // Eliminar el 30% más antiguo de comprobantes o al menos 3 comprobantes
+          const numToRemove = Math.max(3, Math.floor(sortedComprobantes.length * 0.3));
+          const trimmedComprobantes = sortedComprobantes.slice(numToRemove);
+          
+          // Guardar lista actualizada sin los comprobantes eliminados
+          localStorage.setItem('comprobantes', JSON.stringify(trimmedComprobantes));
+          
+          // Intentar guardar de nuevo con la lista reducida
+          try {
+            localStorage.setItem('comprobantes', JSON.stringify([...trimmedComprobantes, newComprobante]));
+            setError(null);
+            alert('Se han eliminado algunos comprobantes antiguos para hacer espacio.');
+            router.push('/comprobantes');
+          } catch (finalError) {
+            // Si sigue fallando, sugerir un archivo más pequeño
+            setError('No se pudo guardar. El archivo es demasiado grande. Intenta con un archivo más pequeño o elimina comprobantes antiguos manualmente.');
+          }
+        } else {
+          throw storageError; // Re-lanzar si es un error diferente
         }
       }
-      
-      setIsSuccess(true);
-      
-      // Esperar un momento para mostrar el mensaje de éxito
-      setTimeout(() => {
-        router.push(transactionId ? '/transacciones' : '/comprobantes');
-      }, 1500);
-      
-    } catch (err) {
-      console.error('Error al guardar el comprobante:', err);
-      setError(err instanceof Error ? err.message : 'Error al guardar el comprobante');
+    } catch (error) {
+      console.error('Error creating comprobante:', error);
+      setError('Ha ocurrido un error al guardar el comprobante. Intenta con un archivo más pequeño.');
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   return (
-    <div className="container mx-auto p-4 max-w-2xl">
-      <div className="mb-6 flex items-center gap-2">
-        <button 
-          onClick={() => router.back()} 
-          className="p-2 text-gray-400 hover:text-gray-300 rounded-full hover:bg-gray-800"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-100">
-          {transactionId ? 'Asociar Comprobante' : 'Nuevo Comprobante'}
-        </h1>
-      </div>
-      
-      {transactionDetails && (
-        <div className="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <h2 className="text-lg font-semibold mb-2 text-gray-100">Detalles de la Transacción</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-gray-400 text-sm">Descripción:</p>
-              <p className="text-gray-200">{transactionDetails.description || 'Sin descripción'}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-sm">Monto:</p>
-              <p className={transactionDetails.type === 'income' ? 'text-green-500' : 'text-red-500'}>
-                {transactionDetails.type === 'income' ? '+' : '-'} ${Math.abs(parseFloat(transactionDetails.amount.toString())).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-sm">Fecha:</p>
-              <p className="text-gray-200">{new Date(transactionDetails.date).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-sm">Categoría:</p>
-              <p className="text-gray-200">{transactionDetails.category || 'Sin categoría'}</p>
-            </div>
+    <ProtectedRoute>
+      <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-lg mx-auto bg-gray-800 rounded-lg shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">Subir Comprobante</h2>
+            <Link
+              href="/comprobantes"
+              className="flex items-center text-gray-400 hover:text-white"
+            >
+              <ArrowLeft size={20} className="mr-1" />
+              <span>Volver</span>
+            </Link>
           </div>
-        </div>
-      )}
-      
-      {error && (
-        <div className="mb-6 bg-red-900/30 border border-red-500 text-red-400 p-4 rounded-lg">
-          {error}
-        </div>
-      )}
-      
-      {isSuccess && (
-        <div className="mb-6 bg-green-900/30 border border-green-500 text-green-400 p-4 rounded-lg flex items-center gap-2">
-          <Check size={20} />
-          <span>Comprobante guardado correctamente</span>
-        </div>
-      )}
-      
-      <form onSubmit={handleSubmit} className="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm">
-        {/* Área de drop de archivos */}
-        <div className="mb-6">
-          <label className="block text-sm text-gray-400 mb-2">Archivo de Comprobante</label>
-          {previewUrl ? (
-            <div className="relative">
-              <img 
-                src={previewUrl} 
-                alt="Vista previa" 
-                className="w-full h-64 object-contain border border-gray-700 rounded-lg mb-2 bg-gray-900"
-              />
-              <button
-                type="button"
-                onClick={handleRemoveFile}
-                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ) : file ? (
-            <div className="border border-gray-700 rounded-lg p-4 bg-gray-900 flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-500/20 text-blue-500 p-2 rounded-lg">
-                  <ImageIcon size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{file.name}</p>
-                  <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(2)} KB</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleRemoveFile}
-                className="p-1 text-gray-400 hover:text-red-400"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          ) : (
-            <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors mb-2" onClick={() => document.getElementById('file-upload')?.click()}>
-              <div className="flex flex-col items-center justify-center gap-2">
-                <div className="p-3 bg-blue-500/10 text-blue-400 rounded-full">
-                  <Upload size={24} />
-                </div>
-                <p className="font-medium text-gray-200">Haz clic para seleccionar un archivo</p>
-                <p className="text-sm text-gray-400">o arrastra y suelta aquí</p>
-                <p className="text-xs text-gray-500 mt-2">JPG, PNG o PDF (máx. 5MB)</p>
-              </div>
+          
+          {error && (
+            <div className="mb-4 bg-red-900/30 border border-red-500/50 text-red-200 p-3 rounded-lg">
+              {error}
             </div>
           )}
-          <input
-            id="file-upload"
-            type="file"
-            accept=".jpg,.jpeg,.png,.pdf"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </div>
-        
-        {/* Descripción */}
-        <div className="mb-6">
-          <label htmlFor="description" className="block text-sm text-gray-400 mb-2">Descripción</label>
-          <input
-            type="text"
-            id="description"
-            className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200"
-            placeholder="Descripción del comprobante"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        
-        {/* Categoría */}
-        <div className="mb-6">
-          <label htmlFor="category" className="block text-sm text-gray-400 mb-2">Categoría</label>
-          <input
-            type="text"
-            id="category"
-            className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200"
-            placeholder="Categoría (opcional)"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          />
-        </div>
-        
-        {/* Fecha */}
-        <div className="mb-6">
-          <label htmlFor="date" className="block text-sm text-gray-400 mb-2">Fecha</label>
-          <input
-            type="date"
-            id="date"
-            className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-        
-        {/* Botones */}
-        <div className="flex justify-between">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={isLoading || isSuccess}
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-              isLoading || isSuccess
-                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                <span>Guardando...</span>
-              </>
-            ) : (
-              <span>Guardar Comprobante</span>
-            )}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* File Upload Area */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">
+                Archivo de Comprobante
+              </label>
+              
+              {!file ? (
+                <div 
+                  className="border-2 border-dashed border-gray-600 rounded-lg p-12 text-center cursor-pointer hover:border-blue-500 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                >
+                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-400">
+                    Arrastra un archivo aquí o{' '}
+                    <span className="text-blue-400">selecciona un archivo</span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    PDF, JPG, JPEG o PNG
+                  </p>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                  />
+                </div>
+              ) : (
+                <div className="bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      {filePreview ? (
+                        <div className="h-14 w-14 flex-shrink-0 rounded overflow-hidden border border-gray-600">
+                          <img src={filePreview} alt="Preview" className="h-full w-full object-cover" />
+                        </div>
+                      ) : (
+                        getFileIcon()
+                      )}
+                      <div>
+                        <p className="text-white font-medium truncate" title={file.name}>
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {(file.size / 1024).toFixed(1)} KB • {file.type.split('/')[1].toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
-// Componente principal que envuelve el contenido en un Suspense
-export default function NuevoComprobante() {
-  return (
-    <Suspense fallback={<div className="container mx-auto p-4 flex justify-center">
-      <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-    </div>}>
-      <NuevoComprobanteContent />
-    </Suspense>
+            {/* Folder Selection */}
+            <div>
+              <label htmlFor="folder" className="block text-sm font-medium text-gray-300 mb-1">
+                Carpeta (Opcional)
+              </label>
+              <select
+                id="folder"
+                value={selectedFolder || ''}
+                onChange={(e) => setSelectedFolder(e.target.value || null)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sin carpeta</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
+                Descripción (Opcional)
+              </label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                placeholder="Añade una descripción para este comprobante..."
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || !file}
+              className={`w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                (isLoading || !file) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                  Subiendo...
+                </>
+              ) : (
+                'Guardar Comprobante'
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    </ProtectedRoute>
   );
 } 

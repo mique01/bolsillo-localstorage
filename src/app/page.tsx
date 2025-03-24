@@ -5,6 +5,8 @@ import { BarChart3, Receipt, PiggyBank, Settings, DollarSign, TrendingUp, Trendi
 import Link from 'next/link';
 import { ArrowRight, Send, Loader2, Plus, ArrowDown, ArrowUp } from 'lucide-react';
 import { CustomLink } from '@/components/ClientLayout';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../lib/hooks/useAuth';
 
 const features = [
   {
@@ -60,7 +62,9 @@ type LearnedPattern = {
   count: number;           // Contador de usos para reforzar el aprendizaje
 };
 
-export default function Home() {
+export default function HomePage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [balance, setBalance] = useState(0);
@@ -76,6 +80,16 @@ export default function Home() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [pendingTransaction, setPendingTransaction] = useState<Partial<Transaction> | null>(null);
   const [awaitingPaymentMethod, setAwaitingPaymentMethod] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        router.push('/login');
+      }
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     const savedTransactions = localStorage.getItem('transactions');
@@ -554,140 +568,8 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex flex-col">
-      <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
-        <div className="mb-16">
-          <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-indigo-400 text-transparent bg-clip-text mb-4">
-            Gestiona tus finanzas
-          </h1>
-          <p className="text-gray-400 text-lg max-w-2xl">
-            Simplifica el control de tus gastos e ingresos y toma decisiones financieras más inteligentes.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div className="bg-[#1e293b] p-6 rounded-xl border border-gray-800 shadow-lg transform transition-all hover:shadow-xl hover:scale-[1.01]">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-gray-100">Acciones rápidas</h2>
-                  <Plus className="text-purple-400" />
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <CustomLink 
-                    href="/transacciones/nueva/?type=expense" 
-                    className="flex items-center gap-3 p-3.5 bg-gradient-to-r from-red-500/20 to-red-400/10 text-red-300 rounded-lg hover:from-red-500/30 hover:to-red-400/20 transition-all border border-red-500/20"
-                  >
-                    <ArrowDown size={20} />
-                    <span className="font-medium">Nuevo Gasto</span>
-                    <ArrowRight size={16} className="ml-auto" />
-                  </CustomLink>
-                  <CustomLink 
-                    href="/transacciones/nueva/?type=income" 
-                    className="flex items-center gap-3 p-3.5 bg-gradient-to-r from-green-500/20 to-green-400/10 text-green-300 rounded-lg hover:from-green-500/30 hover:to-green-400/20 transition-all border border-green-500/20"
-                  >
-                    <ArrowUp size={20} />
-                    <span className="font-medium">Nuevo Ingreso</span>
-                    <ArrowRight size={16} className="ml-auto" />
-                  </CustomLink>
-                  <CustomLink 
-                    href="/dashboard" 
-                    className="flex items-center gap-3 p-3.5 bg-gradient-to-r from-blue-500/20 to-blue-400/10 text-blue-300 rounded-lg hover:from-blue-500/30 hover:to-blue-400/20 transition-all border border-blue-500/20"
-                  >
-                    <span className="font-medium">Ver Dashboard</span>
-                    <ArrowRight size={16} className="ml-auto" />
-                  </CustomLink>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1e293b] p-6 rounded-xl border border-gray-800 shadow-lg transform transition-all hover:shadow-xl hover:scale-[1.01]">
-              <h2 className="text-xl font-semibold text-gray-100 mb-4">Enlaces rápidos</h2>
-              <div className="grid grid-cols-1 gap-3">
-                <CustomLink href="/transacciones" 
-                  className="flex items-center justify-between p-3.5 bg-[#0f172a] rounded-lg hover:bg-[#151e33] transition-all border border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <Receipt className="h-5 w-5 text-purple-400" />
-                    <span className="text-gray-200 font-medium">Transacciones</span>
-                  </div>
-                  <ArrowRight size={16} className="text-gray-500" />
-                </CustomLink>
-                <CustomLink href="/comprobantes" 
-                  className="flex items-center justify-between p-3.5 bg-[#0f172a] rounded-lg hover:bg-[#151e33] transition-all border border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <DollarSign className="h-5 w-5 text-purple-400" />
-                    <span className="text-gray-200 font-medium">Comprobantes</span>
-                  </div>
-                  <ArrowRight size={16} className="text-gray-500" />
-                </CustomLink>
-                <CustomLink href="/presupuestos" 
-                  className="flex items-center justify-between p-3.5 bg-[#0f172a] rounded-lg hover:bg-[#151e33] transition-all border border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <PiggyBank className="h-5 w-5 text-purple-400" />
-                    <span className="text-gray-200 font-medium">Presupuestos</span>
-                  </div>
-                  <ArrowRight size={16} className="text-gray-500" />
-                </CustomLink>
-              </div>
-            </div>
-          </div>
-
-          {/* Chat IA */}
-          <div className="bg-[#1e293b] rounded-xl border border-gray-800 shadow-lg overflow-hidden flex flex-col">
-            <div className="bg-gradient-to-r from-purple-800/30 to-indigo-800/30 p-4 border-b border-gray-800">
-              <h2 className="text-lg font-medium text-gray-100">Asistente Financiero</h2>
-              <p className="text-gray-400 text-sm">Registra transacciones conversando (ej: &quot;gasté 1 luca en el kiosco&quot;, &quot;papá me mandó 5 lucas&quot;)</p>
-            </div>
-            
-            <div className="flex-1 p-4 overflow-y-auto max-h-[400px] space-y-4">
-              {messages.map((message, index) => (
-                <div 
-                  key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div 
-                    className={`max-w-[85%] p-3.5 rounded-lg ${
-                      message.role === 'user' 
-                        ? 'bg-gradient-to-r from-purple-500/30 to-indigo-500/20 text-gray-50 border border-purple-500/30' 
-                        : 'bg-[#0f172a] text-gray-200 border border-gray-800'
-                    }`}
-                  >
-                    {message.content}
-                  </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] p-3.5 rounded-lg bg-[#0f172a] text-gray-200 border border-gray-800">
-                    <Loader2 className="animate-spin" size={20} />
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-            
-            <form onSubmit={handleSubmit} className="border-t border-gray-800 p-4">
-              <div className="flex items-center gap-2">
-                <input 
-                  type="text" 
-                  value={inputValue}
-                  onChange={handleInputChange}
-                  placeholder="Ej: Gasté 1 luca en el super / Papá me mandó 5 lucas" 
-                  className="flex-1 bg-[#0f172a] text-gray-200 p-3.5 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  disabled={isLoading}
-                />
-                <button 
-                  type="submit" 
-                  className="bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600 text-white p-3.5 rounded-lg transition-all disabled:opacity-50"
-                  disabled={isLoading || !inputValue.trim()}
-                >
-                  {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
+    <div className="flex justify-center items-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
     </div>
   );
 }

@@ -2,8 +2,7 @@ import "@/app/globals.css";
 import { Inter } from "next/font/google";
 import type { Metadata } from "next";
 import ClientLayout from "../components/ClientLayout";
-import { SupabaseAuthProvider } from '@/lib/contexts/SupabaseAuthContext';
-import ConnectionManager from './components/ConnectionManager';
+import { AuthProvider } from '../lib/contexts/AuthContext';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -94,10 +93,9 @@ export default function RootLayout({
         {/* No usamos link para tailwind.css ya que se importa vía @import */}
       </head>
       <body className={`${inter.className} h-full text-gray-900 dark:text-gray-100`}>
-        <SupabaseAuthProvider>
+        <AuthProvider>
           <ClientLayout>{children}</ClientLayout>
-          <ConnectionManager />
-        </SupabaseAuthProvider>
+        </AuthProvider>
       </body>
     </html>  
   );

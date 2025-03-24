@@ -1,20 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { 
-  Plus, Edit, Trash, Filter, ArrowRight, Calendar, PieChart, Save, X, Trash2
+  Plus, Edit, Trash, Filter, ArrowRight, Calendar, PieChart, Save, X, Trash2, AlertCircle, Check 
 } from 'lucide-react';
+import { useAuth } from '../../lib/hooks/useAuth';
+import ProtectedRoute from '../components/ProtectedRoute';
+import { formatCurrency } from '../../lib/utils';
 
 type Budget = {
   id: string;
+  userId: string;
   category: string;
   amount: number;
-  spent: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type Category = {
+  id: string;
+  userId: string;
+  name: string;
+  type: 'income' | 'expense';
 };
 
 type Transaction = {
   id: string;
+  userId: string;
   description: string;
   amount: number;
   date: string;
@@ -23,309 +35,311 @@ type Transaction = {
 };
 
 export default function PresupuestosPage() {
+  const { user } = useAuth();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [newBudget, setNewBudget] = useState<Partial<Budget>>({
-    category: '',
-    amount: 0
-  });
-  const [filter, setFilter] = useState('all');
+  const [categories, setCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [showBudgetCategories, setShowBudgetCategories] = useState(false);
-  const [newBudgetCategory, setNewBudgetCategory] = useState('');
-  const [budgetCategories, setBudgetCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [budgetAmount, setBudgetAmount] = useState('');
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   
-  // Nueva forma de presupuesto
-  const [formData, setFormData] = useState<Budget>({
-    id: '',
-    category: '',
-    amount: 0,
-    spent: 0
-  });
-  
-  // Estado para editar
-  const [isEditing, setIsEditing] = useState(false);
-
-  // Cargar presupuestos y transacciones
+  // Cargar presupuestos, transacciones y categorías
   useEffect(() => {
-    const savedBudgets = localStorage.getItem('budgets');
-    const savedTransactions = localStorage.getItem('transactions');
+    if (!user) return;
     
-    if (savedBudgets) {
-      setBudgets(JSON.parse(savedBudgets));
-    }
-    
-    if (savedTransactions) {
-      const parsedTransactions = JSON.parse(savedTransactions);
-      setTransactions(parsedTransactions);
-      
-      // Obtener categorías únicas de gastos
-      const uniqueCategories = Array.from(new Set<string>(
-        parsedTransactions
-          .filter((t: Transaction) => t.type === 'expense')
-          .map((t: Transaction) => t.category)
+    // Cargar categorías
+    const storedCategories = localStorage.getItem('categories');
+    if (storedCategories) {
+      const allCategories = JSON.parse(storedCategories);
+      // Filtrar categorías de gastos de este usuario
+      setCategories(allCategories.filter((c: Category) => 
+        c.userId === user.id && c.type === 'expense'
       ));
-      setCategories(uniqueCategories);
-    }
-  }, []);
-
-  // Guardar datos cuando cambian
-  useEffect(() => {
-    if (budgets.length > 0) {
-      localStorage.setItem('budgets', JSON.stringify(budgets));
     }
     
-    if (budgetCategories.length > 0) {
-      localStorage.setItem('budget_categories', JSON.stringify(budgetCategories));
+    // Cargar presupuestos
+    const storedBudgets = localStorage.getItem('budgets');
+    if (storedBudgets) {
+      const allBudgets = JSON.parse(storedBudgets);
+      setBudgets(allBudgets.filter((b: Budget) => b.userId === user.id));
     }
-  }, [budgets, budgetCategories]);
+    
+    // Cargar transacciones
+    const storedTransactions = localStorage.getItem('transactions');
+    if (storedTransactions) {
+      const allTransactions = JSON.parse(storedTransactions);
+      setTransactions(allTransactions.filter((t: Transaction) => 
+        t.userId === user.id && t.type === 'expense'
+      ));
+    }
+  }, [user]);
 
-  // Calcular gastos por categoría
-  const getSpentByCategory = (category: string) => {
+  // Calcular gastos totales por categoría
+  const getSpentByCategory = (categoryName: string) => {
     return transactions
-      .filter(t => t.type === 'expense' && t.category === category)
+      .filter(t => t.category === categoryName)
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
-  const handleAddBudget = () => {
-    if (!newBudget.category || !newBudget.amount) return;
-
-    const budget: Budget = {
-      id: Date.now().toString(),
-      category: newBudget.category,
-      amount: newBudget.amount,
-      spent: getSpentByCategory(newBudget.category)
-    };
-
-    const updatedBudgets = [...budgets, budget];
-    setBudgets(updatedBudgets);
-    localStorage.setItem('budgets', JSON.stringify(updatedBudgets));
-    setNewBudget({ category: '', amount: 0 });
-  };
-
-  const handleDeleteBudget = (id: string) => {
-    const updatedBudgets = budgets.filter(b => b.id !== id);
-    setBudgets(updatedBudgets);
-    localStorage.setItem('budgets', JSON.stringify(updatedBudgets));
-  };
-
-  // Función para agregar nueva categoría
-  const handleAddCategory = () => {
-    if (newBudgetCategory && !budgetCategories.includes(newBudgetCategory)) {
-      setBudgetCategories([...budgetCategories, newBudgetCategory]);
-      setNewBudgetCategory('');
+  // Función para añadir/editar presupuesto
+  const handleSaveBudget = () => {
+    if (!user) return;
+    if (!selectedCategory || !budgetAmount || isNaN(parseFloat(budgetAmount))) {
+      setError('Por favor, selecciona una categoría y establece un monto válido');
+      setTimeout(() => setError(''), 3000);
+      return;
     }
-  };
-
-  // Función para eliminar categoría
-  const handleDeleteCategory = (category: string) => {
-    setBudgetCategories(budgetCategories.filter(cat => cat !== category));
-  };
-
-  // Función para resetear el formulario
-  const resetForm = () => {
-    setFormData({
-      id: '',
-      category: '',
-      amount: 0,
-      spent: 0
-    });
-    setIsEditing(false);
-    setShowForm(false);
-  };
-
-  // Función para manejar el envío del formulario
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
     
-    if (isEditing) {
+    // Verificar si ya existe un presupuesto para esta categoría (si no estamos editando)
+    if (!editingBudgetId && budgets.some(b => b.category === selectedCategory)) {
+      setError('Ya existe un presupuesto para esta categoría');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    
+    if (editingBudgetId) {
       // Actualizar presupuesto existente
       const updatedBudgets = budgets.map(budget => 
-        budget.id === formData.id ? formData : budget
+        budget.id === editingBudgetId 
+          ? {
+              ...budget,
+              amount: parseFloat(budgetAmount),
+              updatedAt: now
+            } 
+          : budget
       );
+      
       setBudgets(updatedBudgets);
+      saveBudgets(updatedBudgets);
+      setSuccess('Presupuesto actualizado correctamente');
     } else {
-      // Agregar nuevo presupuesto
-      const newBudget = {
-        ...formData,
+      // Crear nuevo presupuesto
+      const newBudget: Budget = {
         id: Date.now().toString(),
+        userId: user.id,
+        category: selectedCategory,
+        amount: parseFloat(budgetAmount),
+        createdAt: now,
+        updatedAt: now
       };
-      setBudgets([...budgets, newBudget]);
+      
+      const updatedBudgets = [...budgets, newBudget];
+      setBudgets(updatedBudgets);
+      saveBudgets(updatedBudgets);
+      setSuccess('Presupuesto creado correctamente');
     }
     
+    setTimeout(() => setSuccess(''), 3000);
     resetForm();
   };
 
+  // Guardar presupuestos en localStorage
+  const saveBudgets = (budgetsData: Budget[]) => {
+    // Leer todos los presupuestos existentes
+    const storedBudgets = localStorage.getItem('budgets');
+    let allBudgets = storedBudgets ? JSON.parse(storedBudgets) : [];
+    
+    // Filtrar los presupuestos que no son de este usuario
+    allBudgets = allBudgets.filter((b: Budget) => b.userId !== user?.id);
+    
+    // Agregar los presupuestos del usuario actual
+    allBudgets = [...allBudgets, ...budgetsData];
+    
+    // Guardar todo
+    localStorage.setItem('budgets', JSON.stringify(allBudgets));
+  };
+
+  // Resetear formulario
+  const resetForm = () => {
+    setSelectedCategory('');
+    setBudgetAmount('');
+    setEditingBudgetId(null);
+    setShowForm(false);
+  };
+
   // Función para editar presupuesto
-  const handleEdit = (budget: Budget) => {
-    setFormData(budget);
-    setIsEditing(true);
+  const handleEditBudget = (budget: Budget) => {
+    setSelectedCategory(budget.category);
+    setBudgetAmount(budget.amount.toString());
+    setEditingBudgetId(budget.id);
     setShowForm(true);
   };
 
+  // Función para eliminar presupuesto
+  const handleDeleteBudget = (id: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar este presupuesto?')) {
+      const updatedBudgets = budgets.filter(b => b.id !== id);
+      setBudgets(updatedBudgets);
+      saveBudgets(updatedBudgets);
+      setSuccess('Presupuesto eliminado correctamente');
+      setTimeout(() => setSuccess(''), 3000);
+    }
+  };
+
   return (
-    <div className="space-y-6 dark-theme">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Presupuestos</h1>
-      </div>
-
-      {/* Formulario para agregar presupuesto */}
-      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-        <h2 className="text-lg font-medium mb-4">Nuevo Presupuesto</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Categoría</label>
-            <select
-              className="w-full px-4 py-2 border rounded-md bg-gray-700 border-gray-600"
-              value={newBudget.category}
-              onChange={(e) => setNewBudget({ ...newBudget, category: e.target.value })}
+    <ProtectedRoute>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-white">Presupuestos</h1>
+          {!showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-              <option value="">Selecciona una categoría</option>
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Monto</label>
-            <input
-              type="number"
-              className="w-full px-4 py-2 border rounded-md bg-gray-700 border-gray-600"
-              value={newBudget.amount}
-              onChange={(e) => setNewBudget({ ...newBudget, amount: Number(e.target.value) })}
-            />
-          </div>
+              <Plus size={18} />
+              <span>Nuevo Presupuesto</span>
+            </button>
+          )}
         </div>
-        <button
-          onClick={handleAddBudget}
-          className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={20} />
-          Agregar Presupuesto
-        </button>
-      </div>
 
-      {/* Lista de presupuestos */}
-      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-        <h2 className="text-lg font-medium mb-4">Presupuestos Actuales</h2>
-        <div className="space-y-4">
-          {budgets.map(budget => {
-            const progress = (budget.spent / budget.amount) * 100;
-            const isOverBudget = progress > 100;
+        {success && (
+          <div className="bg-green-900/30 border border-green-500/50 text-green-200 p-3 rounded-lg flex items-start gap-2">
+            <Check size={18} className="mt-0.5 flex-shrink-0" />
+            <p>{success}</p>
+          </div>
+        )}
 
-            return (
-              <div key={budget.id} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-medium">{budget.category}</h3>
-                    <p className="text-sm text-gray-400">
-                      ${budget.spent.toFixed(2)} / ${budget.amount.toFixed(2)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteBudget(budget.id)}
-                    className="p-1 hover:bg-gray-700 rounded-full transition-colors"
-                  >
-                    <Trash2 size={18} className="text-red-400" />
-                  </button>
-                </div>
-                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      isOverBudget ? 'bg-red-500' : 'bg-blue-500'
-                    }`}
-                    style={{ width: `${Math.min(progress, 100)}%` }}
-                  />
-                </div>
+        {error && (
+          <div className="bg-red-900/30 border border-red-500/50 text-red-200 p-3 rounded-lg flex items-start gap-2">
+            <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Formulario para agregar/editar presupuesto */}
+        {showForm && (
+          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium text-white">
+                {editingBudgetId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
+              </h2>
+              <button
+                onClick={resetForm}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-200 mb-1">
+                  Categoría de Gasto
+                </label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  disabled={!!editingBudgetId}
+                  className="w-full px-3 py-2 rounded-md bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecciona una categoría</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            );
-          })}
-          {budgets.length === 0 && (
-            <p className="text-gray-400 text-center py-4">
-              No hay presupuestos configurados. Agrega uno para comenzar.
-            </p>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-200 mb-1">
+                  Monto del Presupuesto
+                </label>
+                <input
+                  type="number"
+                  value={budgetAmount}
+                  onChange={(e) => setBudgetAmount(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSaveBudget}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  <Save size={18} />
+                  <span>{editingBudgetId ? 'Actualizar' : 'Guardar'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lista de presupuestos */}
+        <div className="grid gap-4 mb-8">
+          {budgets.length === 0 ? (
+            <div className="bg-gray-800/50 rounded-lg p-6 text-center border border-gray-700">
+              <p className="text-gray-400">
+                No hay presupuestos definidos. Crea uno para comenzar a gestionar tus gastos.
+              </p>
+            </div>
+          ) : (
+            budgets.map((budget) => {
+              const spent = getSpentByCategory(budget.category);
+              const percentage = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
+              const isOverBudget = percentage > 100;
+              
+              return (
+                <div key={budget.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                  <div className="flex justify-between mb-2">
+                    <div>
+                      <h3 className="font-medium text-white">{budget.category}</h3>
+                      <div className="text-sm text-gray-400">
+                        Presupuesto: {formatCurrency(budget.amount)}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditBudget(budget)}
+                        className="p-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-blue-400"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBudget(budget.id)}
+                        className="p-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-red-400"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-1 flex justify-between items-center text-sm">
+                    <span className="text-gray-300">
+                      Gastado: {formatCurrency(spent)}
+                    </span>
+                    <span className={isOverBudget ? 'text-red-400' : 'text-green-400'}>
+                      {percentage.toFixed(0)}%
+                    </span>
+                  </div>
+                  
+                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${
+                        isOverBudget 
+                          ? 'bg-gradient-to-r from-red-500 to-red-400' 
+                          : percentage > 70 
+                            ? 'bg-gradient-to-r from-yellow-500 to-yellow-400'
+                            : 'bg-gradient-to-r from-green-500 to-green-400'
+                      }`}
+                      style={{ width: `${Math.min(percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
-}
-
-const BudgetCard = ({ budget, onEdit, onDelete }: { 
-  budget: Budget; 
-  onEdit: () => void; 
-  onDelete: () => void;
-}) => {
-  const { category, amount, spent } = budget;
-  
-  const percentage = Math.min(100, Math.round((spent / amount) * 100));
-  const remaining = amount - spent;
-  const isOverBudget = remaining < 0;
-  
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-  
-  const getProgressColor = () => {
-    if (percentage >= 90) return 'bg-red-500';
-    if (percentage >= 70) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
-
-  return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 shadow-md flex flex-col">
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
-          <h3 className="font-medium text-lg text-white">{category}</h3>
-        </div>
-        <div className="flex space-x-1">
-          <button
-            onClick={onEdit}
-            className="p-1 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded"
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded"
-          >
-            <Trash size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-3 space-y-1">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-400">Presupuesto:</span>
-          <span className="font-medium">${amount.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-400">Gastado:</span>
-          <span className={`font-medium ${isOverBudget ? 'text-red-500' : 'text-green-500'}`}>
-            ${spent.toFixed(2)}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-400">Restante:</span>
-          <span className={`font-medium ${isOverBudget ? 'text-red-500' : 'text-green-500'}`}>
-            ${remaining.toFixed(2)}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-3 bg-gray-700 h-2 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${getProgressColor()}`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      
-      <div className="mt-1 flex justify-between items-center text-xs text-gray-400">
-        <span>{percentage}% usado</span>
-        <span>{isOverBudget ? 'Excedido' : `${(100 - percentage)}% disponible`}</span>
-      </div>
-    </div>
-  );
-}; 
+} 

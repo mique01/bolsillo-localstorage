@@ -1,8 +1,0 @@
-{
-  "ip": "supabase.co",
-  "fallbacks": [
-    "https://corsproxy.io/?https://cxfnamwzbfrdaahfsqkc.supabase.co",
-    "https://api.allorigins.win/raw?url=https://cxfnamwzbfrdaahfsqkc.supabase.co"
-  ],
-  "use_proxy": true
-} 
