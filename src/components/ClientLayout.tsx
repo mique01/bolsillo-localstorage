@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  Home,
   BarChart3,
   Receipt,
   PiggyBank,
@@ -14,50 +13,58 @@ import {
   Menu,
   X,
   DollarSign,
-  LifeBuoy,
 } from "lucide-react";
 import { useAuth } from "../lib/hooks/useAuth";
-import { DebugTool } from './DebugTool';
 
 // Componente simple de carga
 const LoadingScreen = () => (
-  <div className="flex items-center justify-center h-screen bg-gray-900">
-    <div className="animate-spin h-12 w-12 border-4 border-indigo-500 rounded-full border-t-transparent"></div>
+  <div className="flex items-center justify-center h-screen bg-black">
+    <div className="animate-spin h-12 w-12 border-4 border-blue-500 rounded-full border-t-transparent"></div>
   </div>
 );
 
 // Layout principal simple
 const MainLayout = ({ children }: { children: React.ReactNode }) => (
-  <div className="min-h-screen bg-gray-900">{children}</div>
+  <div className="min-h-screen bg-black">{children}</div>
 );
 
-// Navbar simple
+// Navbar
 const Navbar = ({ 
   showMenu, 
-  setShowMenu 
+  setShowMenu,
+  user
 }: { 
   showMenu: boolean; 
-  setShowMenu: React.Dispatch<React.SetStateAction<boolean>>; 
+  setShowMenu: React.Dispatch<React.SetStateAction<boolean>>;
+  user: any;
 }) => (
-  <div className="fixed top-0 left-0 right-0 z-40 bg-gray-800 border-b border-gray-700">
-    <div className="flex items-center justify-between h-16 px-4">
-      <Link href="/" className="flex items-center">
-        <div className="p-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-md shadow-lg">
-          <PiggyBank size={20} className="text-white" />
+  <header className="fixed top-0 right-0 left-0 lg:left-64 z-10 h-16 bg-gray-900 border-b border-gray-800">
+    <div className="flex items-center justify-between h-full px-4">
+      <div className="flex items-center">
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="p-2 text-gray-400 hover:text-white focus:outline-none lg:hidden"
+        >
+          {showMenu ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+      
+      <div className="flex items-center">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+            <User size={16} className="text-gray-300" />
+          </div>
+          <div className="hidden md:block">
+            <p className="text-sm font-medium">{user?.username || user?.email}</p>
+            <p className="text-xs text-gray-400">Usuario</p>
+          </div>
         </div>
-        <span className="ml-2 text-lg font-semibold text-white">Bolsillo App</span>
-      </Link>
-      <button
-        onClick={() => setShowMenu(!showMenu)}
-        className="p-2 text-gray-400 hover:text-white focus:outline-none md:hidden"
-      >
-        {showMenu ? <X size={20} /> : <Menu size={20} />}
-      </button>
+      </div>
     </div>
-  </div>
+  </header>
 );
 
-// Sidebar simple
+// Sidebar
 const Sidebar = ({ showMenu }: { showMenu: boolean }) => {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
@@ -77,25 +84,19 @@ const Sidebar = ({ showMenu }: { showMenu: boolean }) => {
   };
 
   return (
-    <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 border-r border-gray-700 shadow-lg transform transition-all duration-300 pt-16
-      ${showMenu ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-    >
+    <aside className={`fixed z-20 inset-y-0 left-0 w-64 bg-gray-900 transform transition-transform duration-300 lg:translate-x-0 ${
+      showMenu ? '-translate-x-full' : 'translate-x-0'
+    }`}>
       <div className="flex flex-col h-full">
-        {/* User Profile Section */}
-        <div className="p-4 border-b border-gray-700">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gray-700 rounded-full">
-              <User size={20} className="text-gray-300" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white">{user?.username}</p>
-              <p className="text-xs text-gray-400">{user?.profileType || 'Personal'}</p>
-            </div>
-          </div>
+        {/* App Logo */}
+        <div className="flex items-center justify-center h-16 border-b border-gray-800">
+          <Link href="/dashboard" className="text-xl font-bold text-white">
+            Bolsillo App
+          </Link>
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-4 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.path;
@@ -104,36 +105,31 @@ const Sidebar = ({ showMenu }: { showMenu: boolean }) => {
               <Link
                 key={item.path}
                 href={item.path}
-                className={`flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                className={`flex items-center px-4 py-2 rounded-md transition-colors ${
                   isActive
-                    ? "bg-gradient-to-r from-purple-600/30 to-indigo-600/20 text-white border border-purple-500/30"
-                    : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
                 }`}
               >
-                <Icon size={20} className={`mr-3 transition-colors ${
-                  isActive ? 'text-purple-400' : 'text-gray-400 group-hover:text-white'
-                }`} />
-                <span className="text-sm font-medium">{item.label}</span>
-                {isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-purple-400" />
-                )}
+                <Icon size={18} className="mr-3" />
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
         {/* Bottom Section */}
-        <div className="p-4 border-t border-gray-700">
+        <div className="p-4 border-t border-gray-800">
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+            className="flex items-center w-full px-4 py-2 text-gray-400 rounded-md hover:bg-gray-800 hover:text-white transition-colors"
           >
-            <LogOut size={20} className="mr-3" />
+            <LogOut size={18} className="mr-3" />
             <span>Cerrar Sesión</span>
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 };
 
@@ -220,12 +216,6 @@ function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, isPublicRoute, router, pathname]);
 
-  // Handle logout
-  const handleLogout = async () => {
-    signOut();
-    router.push('/login');
-  };
-
   // Show loading screen while checking auth
   if (loading) {
     return <LoadingScreen />;
@@ -236,29 +226,20 @@ function Layout({ children }: { children: React.ReactNode }) {
     return <LoadingScreen />;
   }
 
-  // Don't show layout on public routes
+  // Si es una ruta pública como login, mostrar sin sidebar ni header
   if (isPublicRoute) {
-    return <>{children}</>;
+    return <MainLayout>{children}</MainLayout>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {/* Overlay for mobile menu */}
-      {showMenu && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden"
-          onClick={() => setShowMenu(false)}
-        />
-      )}
+    <div className="flex h-screen bg-black">
+      <Sidebar showMenu={showMenu} />
       
-      {/* Navbar */}
-      <Navbar showMenu={showMenu} setShowMenu={setShowMenu} />
-      
-      {/* Main Layout */}
-      <div className="flex min-h-screen pt-16">
-        <Sidebar showMenu={showMenu} />
-        <main className="flex-1 p-4 md:p-8 transition-all duration-300 md:ml-64">
-          <div className="max-w-6xl mx-auto">
+      <div className="flex-1 lg:ml-64">
+        <Navbar showMenu={showMenu} setShowMenu={setShowMenu} user={user} />
+        
+        <main className="pt-16 px-4 h-full overflow-y-auto">
+          <div className="max-w-7xl mx-auto py-6">
             {children}
           </div>
         </main>
@@ -267,6 +248,4 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  return <Layout>{children}</Layout>;
-} 
+export default Layout; 

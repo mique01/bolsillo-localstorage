@@ -184,7 +184,7 @@ export default function PresupuestosPage() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white">Presupuestos</h1>
           {!showForm && (
             <button
@@ -218,16 +218,16 @@ export default function PresupuestosPage() {
               <h2 className="text-lg font-medium text-white">
                 {editingBudgetId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
               </h2>
-              <button
+        <button
                 onClick={resetForm}
                 className="text-gray-400 hover:text-gray-200"
-              >
+        >
                 <X size={20} />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
+        </button>
+      </div>
+
+        <div className="space-y-4">
+                  <div>
                 <label className="block text-sm font-medium text-gray-200 mb-1">
                   Categoría de Gasto
                 </label>
@@ -244,7 +244,7 @@ export default function PresupuestosPage() {
                     </option>
                   ))}
                 </select>
-              </div>
+                </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-200 mb-1">
@@ -258,8 +258,8 @@ export default function PresupuestosPage() {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
-                />
-              </div>
+                  />
+                </div>
               
               <div className="flex justify-end">
                 <button
@@ -270,8 +270,8 @@ export default function PresupuestosPage() {
                   <span>{editingBudgetId ? 'Actualizar' : 'Guardar'}</span>
                 </button>
               </div>
-            </div>
-          </div>
+        </div>
+      </div>
         )}
 
         {/* Lista de presupuestos */}
@@ -281,14 +281,14 @@ export default function PresupuestosPage() {
               <p className="text-gray-400">
                 No hay presupuestos definidos. Crea uno para comenzar a gestionar tus gastos.
               </p>
-            </div>
+    </div>
           ) : (
             budgets.map((budget) => {
               const spent = getSpentByCategory(budget.category);
               const percentage = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
               const isOverBudget = percentage > 100;
-              
-              return (
+
+  return (
                 <div key={budget.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                   <div className="flex justify-between mb-2">
                     <div>
@@ -296,32 +296,32 @@ export default function PresupuestosPage() {
                       <div className="text-sm text-gray-400">
                         Presupuesto: {formatCurrency(budget.amount)}
                       </div>
-                    </div>
+        </div>
                     <div className="flex gap-2">
-                      <button
+          <button
                         onClick={() => handleEditBudget(budget)}
                         className="p-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-blue-400"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
+          >
+            <Edit size={16} />
+          </button>
+          <button
                         onClick={() => handleDeleteBudget(budget.id)}
                         className="p-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-red-400"
-                      >
+          >
                         <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  
+          </button>
+        </div>
+      </div>
+
                   <div className="mb-1 flex justify-between items-center text-sm">
                     <span className="text-gray-300">
                       Gastado: {formatCurrency(spent)}
-                    </span>
+          </span>
                     <span className={isOverBudget ? 'text-red-400' : 'text-green-400'}>
                       {percentage.toFixed(0)}%
-                    </span>
-                  </div>
-                  
+          </span>
+      </div>
+
                   <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className={`h-full ${
@@ -332,8 +332,8 @@ export default function PresupuestosPage() {
                             : 'bg-gradient-to-r from-green-500 to-green-400'
                       }`}
                       style={{ width: `${Math.min(percentage, 100)}%` }}
-                    />
-                  </div>
+        />
+      </div>
                 </div>
               );
             })

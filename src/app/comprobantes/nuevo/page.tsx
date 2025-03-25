@@ -256,7 +256,7 @@ export default function NuevoComprobantePage() {
               newComprobante.fileData = compressedData;
               
               // Intentar guardar de nuevo
-              localStorage.setItem('comprobantes', JSON.stringify([...existingComprobantes, newComprobante]));
+      localStorage.setItem('comprobantes', JSON.stringify([...existingComprobantes, newComprobante]));
               setError(null);
               router.push('/comprobantes');
               return;
@@ -286,7 +286,7 @@ export default function NuevoComprobantePage() {
             localStorage.setItem('comprobantes', JSON.stringify([...trimmedComprobantes, newComprobante]));
             setError(null);
             alert('Se han eliminado algunos comprobantes antiguos para hacer espacio.');
-            router.push('/comprobantes');
+      router.push('/comprobantes');
           } catch (finalError) {
             // Si sigue fallando, sugerir un archivo más pequeño
             setError('No se pudo guardar. El archivo es demasiado grande. Intenta con un archivo más pequeño o elimina comprobantes antiguos manualmente.');
@@ -323,8 +323,8 @@ export default function NuevoComprobantePage() {
               {error}
             </div>
           )}
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
             {/* File Upload Area */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-300">
@@ -407,22 +407,22 @@ export default function NuevoComprobantePage() {
             </div>
 
             {/* Description */}
-            <div>
+          <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
                 Descripción (Opcional)
-              </label>
+            </label>
               <textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
                 placeholder="Añade una descripción para este comprobante..."
-              />
-            </div>
+            />
+          </div>
 
-            <button
-              type="submit"
+          <button
+            type="submit"
               disabled={isLoading || !file}
               className={`w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
                 (isLoading || !file) ? 'opacity-50 cursor-not-allowed' : ''
@@ -436,10 +436,10 @@ export default function NuevoComprobantePage() {
               ) : (
                 'Guardar Comprobante'
               )}
-            </button>
-          </form>
-        </div>
+          </button>
+        </form>
       </div>
+    </div>
     </ProtectedRoute>
   );
 } 

@@ -35,8 +35,8 @@ export default function ConfiguracionPage() {
     
     if (savedSettings) {
       try {
-        const parsedSettings = JSON.parse(savedSettings);
-        setSettings({
+      const parsedSettings = JSON.parse(savedSettings);
+      setSettings({
           ...parsedSettings,
           userId: user.id,
           people: parsedSettings.people || []
@@ -121,9 +121,9 @@ export default function ConfiguracionPage() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white">Configuración</h1>
-        </div>
+      </div>
 
         {successMessage && (
           <div className="flex items-start gap-2 bg-green-900/30 border border-green-500/50 text-green-200 p-3 rounded-lg">
@@ -139,33 +139,33 @@ export default function ConfiguracionPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Preferencias personales */}
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Preferencias personales */}
+        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
             <h2 className="text-lg font-medium mb-4 flex items-center gap-2 text-white">
-              <Users size={20} className="text-purple-400" />
-              <span>Preferencias personales</span>
-            </h2>
-            
+            <Users size={20} className="text-purple-400" />
+            <span>Preferencias personales</span>
+          </h2>
+          
             <div className="space-y-6">
-              <div>
-                <label className="flex items-center justify-between">
+            <div>
+              <label className="flex items-center justify-between">
                   <span className="text-sm text-gray-200">Vivo con otras personas</span>
-                  <div className="relative inline-block w-12 h-6 transition duration-200 ease-in-out bg-gray-600 rounded-full">
-                    <input
-                      type="checkbox"
-                      className="absolute w-6 h-6 opacity-0 z-10 cursor-pointer"
+                <div className="relative inline-block w-12 h-6 transition duration-200 ease-in-out bg-gray-600 rounded-full">
+                  <input
+                    type="checkbox"
+                    className="absolute w-6 h-6 opacity-0 z-10 cursor-pointer"
                       checked={settings.liveWithOthers}
                       onChange={(e) => handleSettingChange('liveWithOthers', e.target.checked)}
-                    />
-                    <div 
-                      className={`w-6 h-6 transform transition-transform duration-200 ease-in-out bg-white rounded-full ${
+                  />
+                  <div 
+                    className={`w-6 h-6 transform transition-transform duration-200 ease-in-out bg-white rounded-full ${
                         settings.liveWithOthers ? 'translate-x-6' : 'translate-x-0'
-                      }`} 
-                    />
-                  </div>
-                </label>
-                <p className="text-xs text-gray-400 mt-1">
+                    }`} 
+                  />
+                </div>
+              </label>
+              <p className="text-xs text-gray-400 mt-1">
                   {settings.liveWithOthers 
                     ? "Gestiona gastos e ingresos con otras personas" 
                     : "Gestiona tus gastos de forma individual"}
@@ -220,21 +220,21 @@ export default function ConfiguracionPage() {
                   </div>
                 </div>
               )}
-            </div>
           </div>
+        </div>
 
-          {/* Botón guardar */}
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              <Save size={20} />
-              <span>Guardar Configuración</span>
-            </button>
-          </div>
-        </form>
-      </div>
+        {/* Botón guardar */}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            <Save size={20} />
+            <span>Guardar Configuración</span>
+          </button>
+        </div>
+      </form>
+    </div>
     </ProtectedRoute>
   );
 } 

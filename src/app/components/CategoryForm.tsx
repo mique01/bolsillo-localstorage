@@ -147,38 +147,38 @@ export default function CategoryForm({ onClose, onCategoryAdded, initialType = '
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+    <div className="Bolsillo App-card">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-medium text-white">Gestionar Categorías</h2>
-        <button onClick={onClose} className="text-gray-400 hover:text-white">
-          <X size={24} />
+        <h2 className="Bolsillo App-section-title">Gestionar Categorías</h2>
+        <button onClick={onClose} className="Bolsillo App-icon-btn">
+          <X size={18} />
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-900/30 border border-red-500/50 text-red-200 p-3 rounded-lg flex items-start gap-2">
-          <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
-          <p>{error}</p>
+        <div className="mb-4 p-3 rounded-lg flex items-start gap-2 bg-accent-red/10 border border-accent-red/20 text-accent-red">
+          <AlertCircle size={18} className="mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 bg-green-900/30 border border-green-500/50 text-green-200 p-3 rounded-lg flex items-start gap-2">
-          <Check size={18} className="mt-0.5 flex-shrink-0" />
-          <p>{success}</p>
+        <div className="mb-4 p-3 rounded-lg flex items-start gap-2 bg-accent-green/10 border border-accent-green/20 text-accent-green">
+          <Check size={18} className="mt-0.5" />
+          <span>{success}</span>
         </div>
       )}
 
       <div className="mb-6">
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Tipo de Categoría</label>
-          <div className="grid grid-cols-2 gap-2">
+          <label className="block text-sm font-medium mb-2">Tipo de Categoría</label>
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              className={`py-2 px-4 rounded-md flex justify-center items-center ${
+              className={`p-3 rounded-lg border flex items-center justify-center transition-colors ${
                 categoryType === 'expense'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  ? 'bg-red-100/10 border-red-500/40 text-red-400'
+                  : 'border-gray-700 bg-gray-800 hover:bg-gray-700'
               }`}
               onClick={() => setCategoryType('expense')}
             >
@@ -186,10 +186,10 @@ export default function CategoryForm({ onClose, onCategoryAdded, initialType = '
             </button>
             <button
               type="button"
-              className={`py-2 px-4 rounded-md flex justify-center items-center ${
+              className={`p-3 rounded-lg border flex items-center justify-center transition-colors ${
                 categoryType === 'income'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  ? 'bg-green-100/10 border-green-500/40 text-green-400'
+                  : 'border-gray-700 bg-gray-800 hover:bg-gray-700'
               }`}
               onClick={() => setCategoryType('income')}
             >
@@ -200,7 +200,7 @@ export default function CategoryForm({ onClose, onCategoryAdded, initialType = '
 
         <form onSubmit={handleAddCategory} className="space-y-4">
           <div>
-            <label htmlFor="categoryName" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="categoryName" className="block text-sm font-medium mb-1">
               Nombre de la Categoría
             </label>
             <div className="flex">
@@ -209,15 +209,15 @@ export default function CategoryForm({ onClose, onCategoryAdded, initialType = '
                 id="categoryName"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
-                className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-l-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1"
                 placeholder={categoryType === 'expense' ? 'Ej. Alimentación, Transporte' : 'Ej. Salario, Inversiones'}
               />
               <button
                 type="submit"
                 disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-r-md flex items-center"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-r transition-colors"
               >
-                <Plus size={20} />
+                <Plus size={18} />
               </button>
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function CategoryForm({ onClose, onCategoryAdded, initialType = '
       </div>
 
       <div>
-        <h3 className="text-lg font-medium text-white mb-3">
+        <h3 className="text-lg font-medium mb-3">
           {categoryType === 'expense' ? 'Categorías de Gastos' : 'Categorías de Ingresos'}
         </h3>
         
@@ -238,14 +238,14 @@ export default function CategoryForm({ onClose, onCategoryAdded, initialType = '
             {categories.map((category) => (
               <div
                 key={category.id}
-                className="flex items-center justify-between py-2 px-3 bg-gray-700/50 rounded-md"
+                className="flex items-center justify-between p-3 rounded-lg border border-card-border bg-card-bg"
               >
-                <span className="text-white">{category.name}</span>
+                <span>{category.name}</span>
                 <button
                   onClick={() => handleDeleteCategory(category.id)}
-                  className="text-gray-400 hover:text-red-400 p-1"
+                  className="Bolsillo App-icon-btn text-accent-red"
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}

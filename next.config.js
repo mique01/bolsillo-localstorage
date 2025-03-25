@@ -29,7 +29,7 @@ const standardConfig = {
 // Aplicar la configuración correcta según el entorno
 const nextConfig = isGitHubPages
   ? { ...standardConfig, ...githubPagesConfig }
-  : { ...standardConfig, output: 'export' };
+  : standardConfig;
 
 // Configuración de webpack para ambos entornos
 nextConfig.webpack = (config, { isServer }) => {
@@ -69,29 +69,6 @@ nextConfig.webpack = (config, { isServer }) => {
   };
   
   return config;
-};
-
-// Ajustar headers para todos los entornos
-nextConfig.headers = async () => {
-  return [
-    {
-      source: '/(.*)',
-      headers: [
-        {
-          key: 'Access-Control-Allow-Origin',
-          value: '*',
-        },
-        {
-          key: 'Access-Control-Allow-Methods',
-          value: 'GET, POST, PUT, DELETE, OPTIONS',
-        },
-        {
-          key: 'Access-Control-Allow-Headers',
-          value: 'X-Requested-With, Content-Type, Authorization',
-        },
-      ],
-    },
-  ];
 };
 
 // Manejo de errores en tiempo de construcción

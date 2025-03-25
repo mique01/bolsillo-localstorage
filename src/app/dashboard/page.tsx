@@ -15,7 +15,7 @@ import {
   LineElement,
   Filler
 } from 'chart.js';
-import { Wallet, CreditCard, BanknoteIcon, ArrowDownIcon, ArrowUpIcon, TrendingUp, TrendingDown, Calendar, PieChart, Users } from 'lucide-react';
+import { Wallet, CreditCard, TrendingUp, TrendingDown, Calendar, PieChart, Users, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../lib/hooks/useAuth';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { formatCurrency } from '../../lib/utils';
@@ -67,13 +67,39 @@ export default function DashboardPage() {
   const [transactionsByMonth, setTransactionsByMonth] = useState<{[key: string]: {income: number, expense: number}}>({});
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [peopleExpenses, setPeopleExpenses] = useState<{[key: string]: number}>({});
-  const [timeframe, setTimeframe] = useState<'month' | 'year'>('month');
+  const [timeframe, setTimeframe] = useState<'7days' | 'month' | 'year' | 'all'>('month');
+  const [selectedMonth, setSelectedMonth] = useState<string>('Este Mes');
+  const [budgets, setBudgets] = useState<{[key: string]: number}>({});
 
   useEffect(() => {
     if (!user) return;
     
     loadData();
+    loadBudgets();
   }, [user, timeframe]);
+
+  const loadBudgets = () => {
+    if (!user) return;
+    
+    const storedBudgets = localStorage.getItem('budgets');
+    if (storedBudgets) {
+      try {
+        const allBudgets = JSON.parse(storedBudgets);
+        // Filtrar presupuestos del usuario actual
+        const userBudgets = allBudgets.filter((b: any) => b.userId === user.id);
+        
+        // Convertir array de presupuestos a objeto {categoría: monto}
+        const budgetsMap: {[key: string]: number} = {};
+        userBudgets.forEach((budget: any) => {
+          budgetsMap[budget.category] = budget.amount;
+        });
+        
+        setBudgets(budgetsMap);
+      } catch (error) {
+        console.error("Error parsing budgets:", error);
+      }
+    }
+  };
 
   const loadData = () => {
     // Cargar configuración
@@ -117,15 +143,23 @@ export default function DashboardPage() {
     const filteredTransactions = transactions.filter(transaction => {
       const transactionDate = new Date(transaction.date);
       
-      if (timeframe === 'month') {
+      if (timeframe === '7days') {
+        // Filtrar transacciones de los últimos 7 días
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(now.getDate() - 7);
+        return transactionDate >= sevenDaysAgo;
+      } else if (timeframe === 'month') {
         // Filtrar transacciones del mes actual
         return (
           transactionDate.getMonth() === currentMonth &&
           transactionDate.getFullYear() === currentYear
         );
-      } else {
+      } else if (timeframe === 'year') {
         // Filtrar transacciones del año actual
         return transactionDate.getFullYear() === currentYear;
+      } else {
+        // Todas las transacciones (timeframe === 'all')
+        return true;
       }
     });
     
@@ -136,18 +170,53 @@ export default function DashboardPage() {
     const monthlyData: {[key: string]: {income: number, expense: number}} = {};
     const expensesByPerson: {[key: string]: number} = { "Sin asignar": 0 };
     
-    // Inicializar datos mensuales para el año actual
+    // Inicializar datos para el gráfico según el timeframe
     if (timeframe === 'year') {
       const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
       months.forEach(month => {
         monthlyData[month] = { income: 0, expense: 0 };
       });
-    } else {
+    } else if (timeframe === 'month') {
       // Para vista mensual, usar días del mes actual
       const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       for (let i = 1; i <= daysInMonth; i++) {
         monthlyData[i.toString()] = { income: 0, expense: 0 };
       }
+    } else if (timeframe === '7days') {
+      // Para vista de 7 días, usar etiquetas de días relativos (Hoy, Ayer, etc.)
+      const dayLabels = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        
+        if (i === 0) {
+          dayLabels.push('Hoy');
+        } else if (i === 1) {
+          dayLabels.push('Ayer');
+        } else {
+          const day = date.getDate();
+          const month = date.getMonth() + 1;
+          dayLabels.push(`${day}/${month}`);
+        }
+      }
+      
+      dayLabels.forEach(label => {
+        monthlyData[label] = { income: 0, expense: 0 };
+      });
+    } else {
+      // Para 'all', agrupar por meses en el último año
+      const lastYearMonths = [];
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthName = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][date.getMonth()];
+        const year = date.getFullYear();
+        lastYearMonths.push(`${monthName} ${year}`);
+      }
+      
+      lastYearMonths.forEach(label => {
+        monthlyData[label] = { income: 0, expense: 0 };
+      });
     }
     
     // Inicializar gastos por persona
@@ -158,33 +227,79 @@ export default function DashboardPage() {
     }
     
     filteredTransactions.forEach(transaction => {
+      const transactionDate = new Date(transaction.date);
+      
       if (transaction.type === 'income') {
         incomeTotal += transaction.amount;
         
-        // Agregar a datos mensuales
+        // Agregar a datos para el gráfico
+        let dateKey = '';
+        
         if (timeframe === 'year') {
-          const month = new Date(transaction.date).getMonth();
-          const monthName = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month];
-          monthlyData[monthName].income += transaction.amount;
-        } else {
-          const day = new Date(transaction.date).getDate().toString();
-          if (monthlyData[day]) {
-            monthlyData[day].income += transaction.amount;
+          const month = transactionDate.getMonth();
+          dateKey = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month];
+        } else if (timeframe === 'month') {
+          dateKey = transactionDate.getDate().toString();
+        } else if (timeframe === '7days') {
+          const today = new Date();
+          const diffTime = Math.abs(today.getTime() - transactionDate.getTime());
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 0) {
+            dateKey = 'Hoy';
+          } else if (diffDays === 1) {
+            dateKey = 'Ayer';
+          } else {
+            const day = transactionDate.getDate();
+            const month = transactionDate.getMonth() + 1;
+            dateKey = `${day}/${month}`;
           }
+        } else {
+          // Para 'all', usar mes y año
+          const month = transactionDate.getMonth();
+          const monthName = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month];
+          const year = transactionDate.getFullYear();
+          dateKey = `${monthName} ${year}`;
+        }
+        
+        if (monthlyData[dateKey]) {
+          monthlyData[dateKey].income += transaction.amount;
         }
       } else {
         expensesTotal += transaction.amount;
         
-        // Agregar a datos mensuales
+        // Agregar a datos para el gráfico
+        let dateKey = '';
+        
         if (timeframe === 'year') {
-          const month = new Date(transaction.date).getMonth();
-          const monthName = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month];
-          monthlyData[monthName].expense += transaction.amount;
-        } else {
-          const day = new Date(transaction.date).getDate().toString();
-          if (monthlyData[day]) {
-            monthlyData[day].expense += transaction.amount;
+          const month = transactionDate.getMonth();
+          dateKey = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month];
+        } else if (timeframe === 'month') {
+          dateKey = transactionDate.getDate().toString();
+        } else if (timeframe === '7days') {
+          const today = new Date();
+          const diffTime = Math.abs(today.getTime() - transactionDate.getTime());
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 0) {
+            dateKey = 'Hoy';
+          } else if (diffDays === 1) {
+            dateKey = 'Ayer';
+          } else {
+            const day = transactionDate.getDate();
+            const month = transactionDate.getMonth() + 1;
+            dateKey = `${day}/${month}`;
           }
+        } else {
+          // Para 'all', usar mes y año
+          const month = transactionDate.getMonth();
+          const monthName = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month];
+          const year = transactionDate.getFullYear();
+          dateKey = `${monthName} ${year}`;
+        }
+        
+        if (monthlyData[dateKey]) {
+          monthlyData[dateKey].expense += transaction.amount;
         }
         
         // Agregar a gastos por categoría
@@ -236,483 +351,544 @@ export default function DashboardPage() {
     const incomeData = labels.map(label => transactionsByMonth[label].income);
     const expenseData = labels.map(label => transactionsByMonth[label].expense);
     
-    const barChartData = {
+    const lineChartData = {
       labels,
       datasets: [
         {
           label: 'Ingresos',
           data: incomeData,
-          backgroundColor: 'rgba(34, 197, 94, 0.7)',
-          borderColor: 'rgba(34, 197, 94, 1)',
-          borderWidth: 1,
+          fill: false,
+          borderColor: 'rgb(34, 197, 94)', // Verde para ingresos
+          backgroundColor: 'rgb(34, 197, 94)',
+          tension: 0.4,
         },
         {
           label: 'Gastos',
           data: expenseData,
-          backgroundColor: 'rgba(239, 68, 68, 0.7)',
-          borderColor: 'rgba(239, 68, 68, 1)',
-          borderWidth: 1,
-        },
+          fill: false,
+          borderColor: 'rgb(239, 68, 68)', // Rojo para gastos
+          backgroundColor: 'rgb(239, 68, 68)',
+          tension: 0.4,
+        }
       ],
     };
     
-    // Datos para el gráfico de donut (gastos por categoría)
-    const categoryLabels = Object.keys(expensesByCategory);
-    const categoryData = categoryLabels.map(label => expensesByCategory[label]);
-    
-    const doughnutChartData = {
-      labels: categoryLabels,
-      datasets: [
-        {
-          data: categoryData,
-          backgroundColor: [
-            'rgba(59, 130, 246, 0.7)',
-            'rgba(16, 185, 129, 0.7)',
-            'rgba(249, 115, 22, 0.7)',
-            'rgba(168, 85, 247, 0.7)',
-            'rgba(236, 72, 153, 0.7)',
-            'rgba(234, 179, 8, 0.7)',
-            'rgba(14, 165, 233, 0.7)',
-            'rgba(239, 68, 68, 0.7)',
-          ],
-          borderColor: [
-            'rgba(59, 130, 246, 1)',
-            'rgba(16, 185, 129, 1)',
-            'rgba(249, 115, 22, 1)',
-            'rgba(168, 85, 247, 1)',
-            'rgba(236, 72, 153, 1)',
-            'rgba(234, 179, 8, 1)',
-            'rgba(14, 165, 233, 1)',
-            'rgba(239, 68, 68, 1)',
-          ],
-          borderWidth: 1,
-        },
-      ],
-    };
-    
-    // Datos para el gráfico de gastos por persona
-    const peopleLabels = Object.keys(peopleExpenses);
-    const peopleData = peopleLabels.map(label => peopleExpenses[label]);
-    
-    const peopleChartData = {
-      labels: peopleLabels,
-      datasets: [
-        {
-          data: peopleData,
-          backgroundColor: [
-            'rgba(59, 130, 246, 0.7)',
-            'rgba(16, 185, 129, 0.7)',
-            'rgba(249, 115, 22, 0.7)',
-            'rgba(168, 85, 247, 0.7)',
-            'rgba(236, 72, 153, 0.7)',
-          ],
-          borderColor: [
-            'rgba(59, 130, 246, 1)',
-            'rgba(16, 185, 129, 1)',
-            'rgba(249, 115, 22, 1)',
-            'rgba(168, 85, 247, 1)',
-            'rgba(236, 72, 153, 1)',
-          ],
-          borderWidth: 1,
-        },
-      ],
-    };
-    
-    return { barChartData, doughnutChartData, peopleChartData };
+    return lineChartData;
   };
 
-  const { barChartData, doughnutChartData, peopleChartData } = prepareChartData();
-
-  // Formatear fecha
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { 
-      day: 'numeric', 
-      month: 'short'
-    };
-    return new Date(dateString).toLocaleDateString('es-ES', options);
-  };
-
-  // Opciones de gráficos
-  const barChartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: {
-          color: '#e5e7eb'
-        }
-      },
-      title: {
-        display: true,
-        text: timeframe === 'month' ? 'Ingresos vs Gastos (Este Mes)' : 'Ingresos vs Gastos (Este Año)',
-        color: '#e5e7eb'
-      },
-    },
-    scales: {
-      y: {
-        ticks: {
-          color: '#9ca3af'
-        },
-        grid: {
-          color: 'rgba(75, 85, 99, 0.2)'
-        }
-      },
-      x: {
-        ticks: {
-          color: '#9ca3af'
-        },
-        grid: {
-          color: 'rgba(75, 85, 99, 0.2)'
-        }
-      }
-    }
-  };
-
-  const doughnutOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'right' as const,
-        labels: {
-          color: '#e5e7eb'
-        }
-      },
-      title: {
-        display: true,
-        text: 'Gastos por Categoría',
-        color: '#e5e7eb'
-      }
-    }
-  };
-
-  const peopleChartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'right' as const,
-        labels: {
-          color: '#e5e7eb'
-        }
-      },
-      title: {
-        display: true,
-        text: 'Gastos por Persona',
-        color: '#e5e7eb'
-      }
-    }
-  };
-
-  const balance = totalIncome - totalExpenses;
-  const isPositiveBalance = balance >= 0;
-
-  // Agrupar gastos por persona
-  const getExpensesByPerson = () => {
-    if (!settings?.liveWithOthers || !settings?.people || settings.people.length === 0) {
-      return [];
-    }
-    
-    // Solo considerar gastos
-    const expenses = transactions.filter(
-      (t) => t.type === 'expense' && t.person
-    );
-    
-    // Agrupar por persona
-    const expensesByPerson: { [key: string]: number } = {};
-    
-    expenses.forEach((expense) => {
-      if (expense.person) {
-        if (expensesByPerson[expense.person]) {
-          expensesByPerson[expense.person] += expense.amount;
-        } else {
-          expensesByPerson[expense.person] = expense.amount;
-        }
-      }
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', { 
+      day: '2-digit', 
+      month: '2-digit',
+      year: '2-digit' 
     });
-    
-    // Convertir a formato para el gráfico
-    const chartData = Object.entries(expensesByPerson).map(([person, amount]) => ({
-      person,
-      amount,
-    }));
-    
-    // Ordenar por monto (mayor a menor)
-    return chartData.sort((a, b) => b.amount - a.amount);
   };
 
-  // Gráfico de gastos por persona
-  const renderExpensesByPersonChart = () => {
-    const expensesByPerson = getExpensesByPerson();
+  // Componente para mostrar una tarjeta de balance
+  const BalanceCard = ({ title, amount, icon, trend, color }: { 
+    title: string, 
+    amount: number, 
+    icon: React.ReactNode,
+    trend?: { value: number, isUp: boolean },
+    color?: string
+  }) => (
+    <div className="bg-gray-800 rounded-lg shadow-md p-5 border border-gray-700">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-400">{title}</span>
+        <div className={`p-2 rounded-lg ${color || 'bg-blue-900/20'}`}>
+          {icon}
+        </div>
+      </div>
+      <div className="text-2xl font-bold mt-1">{formatCurrency(amount)}</div>
+      
+      {trend && (
+        <div className={`flex items-center text-xs ${trend.isUp ? 'text-green-400' : 'text-red-400'} font-medium`}>
+          {trend.isUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
+          <span>{trend.value}%</span>
+        </div>
+      )}
+    </div>
+  );
+
+  // Componente para selector de mes
+  const MonthSelector = ({ selectedValue, onChange }: {
+    selectedValue: string;
+    onChange: (value: string) => void;
+  }) => (
+    <div className="relative inline-block">
+      <button className="bg-gray-700 px-3 py-1.5 rounded-lg text-sm flex items-center">
+        {selectedValue}
+        <ChevronDown size={14} className="ml-1" />
+      </button>
+    </div>
+  );
+
+  // Componente para renderizar los gastos por categoría
+  const ExpensesByCategoryChart = () => {
+    const chartData = getExpensesByCategory();
     
-    if (!settings?.liveWithOthers || expensesByPerson.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 bg-gray-800/40 rounded-xl border border-gray-700">
-          <p className="text-gray-400">No hay datos disponibles</p>
-          {!settings?.liveWithOthers && (
-            <p className="text-gray-400 text-sm mt-2">
-              Activa "Vivo con otras personas" en configuración
-            </p>
+    return (
+      <div className="bg-gray-800 rounded-lg shadow-md p-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Gastos por Categoría</h3>
+          <MonthSelector 
+            selectedValue={selectedMonth} 
+            onChange={setSelectedMonth}
+          />
+        </div>
+        
+        <div className="h-64">
+          {totalExpenses > 0 ? (
+            <Doughnut 
+              data={chartData} 
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                layout: {
+                  padding: 20
+                },
+                plugins: {
+                  legend: {
+                    position: 'right',
+                    labels: {
+                      boxWidth: 12,
+                      padding: 15,
+                      color: '#ccc'
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context: any) {
+                        const label = context.label || '';
+                        const value = context.raw as number;
+                        const total = (context.chart.getDatasetMeta(0) as any).total || 0;
+                        const percentage = Math.round((value / total) * 100);
+                        return `${label}: ${formatCurrency(value)} (${percentage}%)`;
+                      }
+                    }
+                  }
+                }
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-400">No hay datos de gastos disponibles</p>
+            </div>
           )}
         </div>
-      );
-    }
-    
-    // Colores para las barras
-    const colors = [
-      '#3B82F6', // blue-500
-      '#8B5CF6', // violet-500
-      '#EC4899', // pink-500
-      '#10B981', // emerald-500
-      '#F59E0B', // amber-500
-      '#EF4444', // red-500
-    ];
-    
-    return (
-      <div className="mt-2">
-        <div className="space-y-3">
-          {expensesByPerson.map((item, index) => (
-            <div key={item.person}>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-gray-300">{item.person}</span>
-                <span className="text-sm font-medium text-gray-300">
-                  {formatCurrency(item.amount)}
-                </span>
+        
+        <div className="grid grid-cols-2 gap-3 mt-5">
+          {Object.entries(expensesByCategory).slice(0, 4).map(([category, amount]) => {
+            const percentage = totalExpenses ? Math.round((amount / totalExpenses) * 100) : 0;
+            return (
+              <div key={category} className="flex items-center">
+                <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
+                <div className="flex-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="truncate-text overflow-hidden">{category}</span>
+                    <span>{percentage}%</span>
+                  </div>
+                </div>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-2.5">
-                <div
-                  className="h-2.5 rounded-full"
-                  style={{
-                    width: `${(item.amount / expensesByPerson[0].amount) * 100}%`,
-                    backgroundColor: colors[index % colors.length],
-                  }}
-                ></div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
   };
 
-  // Agrupar transacciones por categoría para el gráfico
+  // Datos para el gráfico de gastos por categoría
   const getExpensesByCategory = () => {
-    // Solo considerar gastos
-    const expenses = transactions.filter((t) => t.type === 'expense');
+    // Convertir datos a formato de gráfico
+    const labels = Object.keys(expensesByCategory);
+    const data = Object.values(expensesByCategory);
     
-    // Agrupar por categoría
-    const expensesByCategory: { [key: string]: number } = {};
-    
-    expenses.forEach((expense) => {
-      if (expense.category) {
-        if (expensesByCategory[expense.category]) {
-          expensesByCategory[expense.category] += expense.amount;
-        } else {
-          expensesByCategory[expense.category] = expense.amount;
-        }
-      }
-    });
-    
-    // Convertir a formato para el gráfico de barras
-    const chartData = Object.entries(expensesByCategory).map(([category, amount]) => ({
-      category,
-      amount,
-    }));
-    
-    // Ordenar por monto (mayor a menor)
-    return chartData.sort((a, b) => b.amount - a.amount);
-  };
-
-  // Gráfico de gastos por categoría
-  const renderExpensesByCategoryChart = () => {
-    const expensesByCategory = getExpensesByCategory();
-    
-    if (expensesByCategory.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 bg-gray-800/40 rounded-xl border border-gray-700">
-          <p className="text-gray-400">No hay datos suficientes</p>
-        </div>
-      );
-    }
-    
-    // Colores para las barras
-    const colors = [
-      '#3B82F6', // blue-500
-      '#8B5CF6', // violet-500
-      '#EC4899', // pink-500
-      '#10B981', // emerald-500
-      '#F59E0B', // amber-500
-      '#EF4444', // red-500
+    // Colores para cada categoría
+    const backgroundColors = [
+      'rgb(54, 162, 235)',
+      'rgb(75, 192, 192)',
+      'rgb(153, 102, 255)',
+      'rgb(255, 159, 64)',
+      'rgb(255, 99, 132)',
     ];
     
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          backgroundColor: backgroundColors,
+          borderWidth: 0,
+        }
+      ]
+    };
+  };
+
+  // Componente para mostrar gastos por persona
+  const ExpensesByPersonChart = () => {
+    const chartData = getExpensesByPerson();
+    
     return (
-      <div className="mt-2">
-        <div className="space-y-3">
-          {expensesByCategory.slice(0, 5).map((item, index) => (
-            <div key={item.category}>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-gray-300">{item.category}</span>
-                <span className="text-sm font-medium text-gray-300">
-                  {formatCurrency(item.amount)}
-                </span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2.5">
-                <div
-                  className="h-2.5 rounded-full"
-                  style={{
-                    width: `${(item.amount / expensesByCategory[0].amount) * 100}%`,
-                    backgroundColor: colors[index % colors.length],
-                  }}
-                ></div>
-              </div>
+      <div className="bg-gray-800 rounded-lg shadow-md p-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Gastos por Persona</h3>
+          <MonthSelector 
+            selectedValue={selectedMonth} 
+            onChange={setSelectedMonth}
+          />
+        </div>
+        
+        <div className="h-64">
+          {Object.keys(peopleExpenses).length > 0 ? (
+            <Doughnut 
+              data={chartData} 
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                layout: {
+                  padding: 20
+                },
+                plugins: {
+                  legend: {
+                    position: 'right',
+                    labels: {
+                      boxWidth: 12,
+                      padding: 15,
+                      color: '#ccc'
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context: any) {
+                        const label = context.label || '';
+                        const value = context.raw as number;
+                        const total = (context.chart.getDatasetMeta(0) as any).total || 0;
+                        const percentage = Math.round((value / total) * 100);
+                        return `${label}: ${formatCurrency(value)} (${percentage}%)`;
+                      }
+                    }
+                  }
+                }
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-400">No hay datos de gastos por persona disponibles</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
     );
+  };
+
+  // Datos para el gráfico de gastos por persona
+  const getExpensesByPerson = () => {
+    // Convertir datos a formato de gráfico
+    const labels = Object.keys(peopleExpenses);
+    const data = Object.values(peopleExpenses);
+    
+    // Colores para cada persona
+    const backgroundColors = [
+      'rgb(153, 102, 255)',
+      'rgb(54, 162, 235)',
+      'rgb(75, 192, 192)',
+      'rgb(255, 159, 64)',
+      'rgb(255, 99, 132)',
+    ];
+    
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          backgroundColor: backgroundColors,
+          borderWidth: 0,
+        }
+      ]
+    };
+  };
+
+  // Componente para mostrar el gráfico de flujo de efectivo
+  const CashFlowChart = () => {
+    const data = prepareChartData();
+
+  return (
+      <div className="bg-gray-800 rounded-lg shadow-md p-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Flujo de Efectivo</h3>
+          <div className="flex space-x-2">
+            <button 
+              onClick={() => setTimeframe('7days')}
+              className={`text-sm px-3 py-1 rounded-lg ${timeframe === '7days' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
+            >
+              7 días
+            </button>
+            <button 
+              onClick={() => setTimeframe('month')}
+              className={`text-sm px-3 py-1 rounded-lg ${timeframe === 'month' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
+            >
+              30 días
+            </button>
+            <button 
+              onClick={() => setTimeframe('year')}
+              className={`text-sm px-3 py-1 rounded-lg ${timeframe === 'year' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
+            >
+              Este Año
+            </button>
+            <button 
+              onClick={() => setTimeframe('all')}
+              className={`text-sm px-3 py-1 rounded-lg ${timeframe === 'all' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}
+            >
+              Todos
+            </button>
+          </div>
+        </div>
+        
+        <div className="h-[300px]">
+          <Line 
+            data={data} 
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: {
+                  grid: {
+                    display: false,
+                    color: 'rgba(100, 100, 100, 0.2)',
+                  },
+                  ticks: {
+                    color: 'rgba(200, 200, 200, 0.8)',
+                  }
+                },
+                y: {
+                  grid: {
+                    color: 'rgba(100, 100, 100, 0.2)',
+                  },
+                  ticks: {
+                    callback: function(value) {
+                      return formatCurrency(value as number);
+                    },
+                    color: 'rgba(200, 200, 200, 0.8)',
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  labels: {
+                    color: 'rgba(200, 200, 200, 0.8)',
+                  }
+                }
+              },
+              elements: {
+                point: {
+                  radius: 3,
+                  hoverRadius: 5,
+                }
+              }
+            }} 
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Componente para mostrar la comparación de gastos vs presupuestos
+  const ExpensesVsBudgetChart = () => {
+    const chartData = getExpensesVsBudgetData();
+    
+    return (
+      <div className="bg-gray-800 rounded-lg shadow-md p-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Gastos vs Presupuestos</h3>
+          <MonthSelector 
+            selectedValue={selectedMonth} 
+            onChange={setSelectedMonth}
+          />
+        </div>
+        
+        <div className="h-64">
+          {Object.keys(budgets).length > 0 ? (
+            <Bar 
+              data={chartData} 
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  x: {
+                    grid: {
+                      display: false,
+                    },
+                    ticks: {
+                      color: 'rgba(200, 200, 200, 0.8)',
+                    }
+                  },
+                  y: {
+                    grid: {
+                      color: 'rgba(100, 100, 100, 0.2)',
+                    },
+                    ticks: {
+                      callback: function(value) {
+                        return formatCurrency(value as number);
+                      },
+                      color: 'rgba(200, 200, 200, 0.8)',
+                    }
+                  }
+                },
+                plugins: {
+                  legend: {
+                    labels: {
+                      color: 'rgba(200, 200, 200, 0.8)',
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const label = context.dataset.label || '';
+                        const value = context.raw as number;
+                        return `${label}: ${formatCurrency(value)}`;
+                      }
+                    }
+                  }
+                },
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-400">No hay presupuestos configurados</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
+  // Datos para el gráfico de gastos vs presupuestos
+  const getExpensesVsBudgetData = () => {
+    // Filtrar categorías que tengan presupuesto asignado
+    const categoriesWithBudget = Object.keys(budgets).filter(category => 
+      budgets[category] > 0 && expensesByCategory[category] !== undefined
+    );
+    
+    // Preparar datos para el gráfico
+    const labels = categoriesWithBudget;
+    const expensesData = categoriesWithBudget.map(category => expensesByCategory[category] || 0);
+    const budgetsData = categoriesWithBudget.map(category => budgets[category] || 0);
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Gastos',
+          data: expensesData,
+          backgroundColor: 'rgb(239, 68, 68)', // Rojo
+        },
+        {
+          label: 'Presupuesto',
+          data: budgetsData,
+          backgroundColor: 'rgb(59, 130, 246)', // Azul
+        }
+      ]
+    };
   };
 
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setTimeframe('month')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                timeframe === 'month'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              Este Mes
-            </button>
-            <button
-              onClick={() => setTimeframe('year')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                timeframe === 'year'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              Este Año
-            </button>
-          </div>
-        </div>
-
-        {/* Tarjetas de resumen */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {/* Balance */}
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-gray-400 text-sm">Balance</h2>
-                <p className={`text-2xl font-bold ${isPositiveBalance ? 'text-green-400' : 'text-red-400'}`}>
-                  {formatCurrency(balance)}
-                </p>
+        {/* Main Balance Cards */}
+        <div className="flex flex-col md:flex-row md:justify-between gap-5">
+          <div className="md:w-1/3">
+            <div className="bg-gray-800 rounded-lg shadow p-5 border border-gray-700 h-full">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-400">Mi Balance</span>
+                <MonthSelector 
+                  selectedValue={selectedMonth} 
+                  onChange={setSelectedMonth}
+                />
               </div>
-              <div className={`p-3 rounded-full ${isPositiveBalance ? 'bg-green-900/30' : 'bg-red-900/30'}`}>
-                <Wallet className={`w-6 h-6 ${isPositiveBalance ? 'text-green-400' : 'text-red-400'}`} />
-              </div>
-            </div>
-            <div className="flex justify-between text-sm text-gray-400 mt-2">
-              <span>Periodo: {timeframe === 'month' ? 'Este Mes' : 'Este Año'}</span>
+              <div className="text-3xl font-bold mt-2">{formatCurrency(totalIncome - totalExpenses)}</div>
+              <p className="text-sm text-gray-400 mt-1">Tu Balance en el Período</p>
+              
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded mt-4 text-sm transition-colors w-full">Agregar Transacción</button>
             </div>
           </div>
-
-          {/* Ingresos */}
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-gray-400 text-sm">Ingresos</h2>
-                <p className="text-2xl font-bold text-green-400">{formatCurrency(totalIncome)}</p>
-              </div>
-              <div className="p-3 rounded-full bg-green-900/30">
-                <ArrowDownIcon className="w-6 h-6 text-green-400" />
-              </div>
-            </div>
-            <div className="flex justify-between text-sm text-gray-400 mt-2">
-              <span>Periodo: {timeframe === 'month' ? 'Este Mes' : 'Este Año'}</span>
-            </div>
-          </div>
-
-          {/* Gastos */}
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-gray-400 text-sm">Gastos</h2>
-                <p className="text-2xl font-bold text-red-400">{formatCurrency(totalExpenses)}</p>
-              </div>
-              <div className="p-3 rounded-full bg-red-900/30">
-                <ArrowUpIcon className="w-6 h-6 text-red-400" />
-              </div>
-            </div>
-            <div className="flex justify-between text-sm text-gray-400 mt-2">
-              <span>Periodo: {timeframe === 'month' ? 'Este Mes' : 'Este Año'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Gráficos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Gráfico de Ingresos vs Gastos */}
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <div className="h-[300px]">
-              <Bar data={barChartData} options={barChartOptions} />
-            </div>
-          </div>
-
-          {/* Gráfico de Gastos por Categoría */}
-          <div className="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-5">
-            <h3 className="text-lg font-medium text-white mb-4">Gastos por Categoría</h3>
-            {renderExpensesByCategoryChart()}
-          </div>
-        </div>
-
-        {/* Fila adicional con gráfico de personas y transacciones recientes */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Gráfico de Gastos por Persona */}
-          <div className="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-5">
-            <h3 className="text-lg font-medium text-white mb-4">Gastos por Persona</h3>
-            {renderExpensesByPersonChart()}
-          </div>
-
-          {/* Transacciones Recientes */}
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <h2 className="text-lg font-medium text-white mb-4">Transacciones Recientes</h2>
+          
+          <div className="md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <BalanceCard 
+              title="Ingresos" 
+              amount={totalIncome} 
+              icon={<Wallet size={18} className="text-green-400" />}
+              trend={{ value: 12, isUp: true }}
+              color="bg-green-800/20"
+            />
             
-            {recentTransactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[230px] text-gray-400">
-                <Calendar size={48} className="mb-4 opacity-50" />
-                <p>No hay transacciones recientes</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[270px] overflow-y-auto pr-2">
-                {recentTransactions.map(transaction => (
-                  <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${
-                        transaction.type === 'income' ? 'bg-green-900/30' : 'bg-red-900/30'
+            <BalanceCard 
+              title="Gastos" 
+              amount={totalExpenses} 
+              icon={<CreditCard size={18} className="text-red-400" />}
+              trend={{ value: 8, isUp: false }}
+              color="bg-red-800/20"
+            />
+          </div>
+        </div>
+        
+        {/* Cash Flow Chart */}
+        <CashFlowChart />
+        
+        {/* Expense Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <ExpensesByCategoryChart />
+          <ExpensesVsBudgetChart />
+        </div>
+        
+        {/* People Expenses Chart (conditional) */}
+        {settings?.liveWithOthers && (
+          <div className="grid grid-cols-1 gap-5">
+            <ExpensesByPersonChart />
+          </div>
+        )}
+        
+        {/* Recent Transactions */}
+        <div className="bg-gray-800 rounded-lg shadow p-6 border border-gray-700">
+          <h3 className="text-lg font-medium">Transacciones Recientes</h3>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-400 border-b border-gray-700">
+                  <th className="pb-3 text-left">Descripción</th>
+                  <th className="pb-3 text-left">Categoría</th>
+                  <th className="pb-3 text-left">Fecha</th>
+                  <th className="pb-3 text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentTransactions.length > 0 ? (
+                  recentTransactions.map((transaction) => (
+                    <tr key={transaction.id} className="border-b border-gray-700">
+                      <td className="py-3 truncate-text overflow-hidden whitespace-nowrap max-w-[200px]">
+                        {transaction.description}
+                      </td>
+                      <td className="py-3">{transaction.category}</td>
+                      <td className="py-3">{formatDate(transaction.date)}</td>
+                      <td className={`py-3 text-right ${
+                        transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
                       }`}>
-                        {transaction.type === 'income' ? (
-                          <ArrowDownIcon className="w-4 h-4 text-green-400" />
-                        ) : (
-                          <ArrowUpIcon className="w-4 h-4 text-red-400" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">{transaction.description}</p>
-                        <p className="text-xs text-gray-400">{formatDate(transaction.date)} • {transaction.category}</p>
-                      </div>
-                    </div>
-                    <p className={`font-medium ${
-                      transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+                        {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-4 text-center text-gray-400">
+                      No hay transacciones recientes
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

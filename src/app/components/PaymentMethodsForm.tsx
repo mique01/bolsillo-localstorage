@@ -144,32 +144,32 @@ export default function PaymentMethodsForm({ onClose, onPaymentMethodAdded }: Pa
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+    <div className="Bolsillo App-card">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-medium text-white">Gestionar Métodos de Pago</h2>
-        <button onClick={onClose} className="text-gray-400 hover:text-white">
-          <X size={24} />
+        <h2 className="Bolsillo App-section-title">Gestionar Métodos de Pago</h2>
+        <button onClick={onClose} className="Bolsillo App-icon-btn">
+          <X size={18} />
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-900/30 border border-red-500/50 text-red-200 p-3 rounded-lg flex items-start gap-2">
-          <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
-          <p>{error}</p>
+        <div className="mb-4 p-3 rounded-lg flex items-start gap-2 bg-accent-red/10 border border-accent-red/20 text-accent-red">
+          <AlertCircle size={18} className="mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 bg-green-900/30 border border-green-500/50 text-green-200 p-3 rounded-lg flex items-start gap-2">
-          <Check size={18} className="mt-0.5 flex-shrink-0" />
-          <p>{success}</p>
+        <div className="mb-4 p-3 rounded-lg flex items-start gap-2 bg-accent-green/10 border border-accent-green/20 text-accent-green">
+          <Check size={18} className="mt-0.5" />
+          <span>{success}</span>
         </div>
       )}
 
       <div className="mb-6">
         <form onSubmit={handleAddMethod} className="space-y-4">
           <div>
-            <label htmlFor="methodName" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="methodName" className="block text-sm font-medium mb-1">
               Nombre del Método de Pago
             </label>
             <div className="flex">
@@ -178,15 +178,15 @@ export default function PaymentMethodsForm({ onClose, onPaymentMethodAdded }: Pa
                 id="methodName"
                 value={methodName}
                 onChange={(e) => setMethodName(e.target.value)}
-                className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-l-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1"
                 placeholder="Ej. Tarjeta de crédito, Efectivo, Transferencia"
               />
               <button
                 type="submit"
                 disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-r-md flex items-center"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-r transition-colors"
               >
-                <Plus size={20} />
+                <Plus size={18} />
               </button>
             </div>
           </div>
@@ -194,7 +194,7 @@ export default function PaymentMethodsForm({ onClose, onPaymentMethodAdded }: Pa
       </div>
 
       <div>
-        <h3 className="text-lg font-medium text-white mb-3">
+        <h3 className="text-lg font-medium mb-3">
           Métodos de Pago Disponibles
         </h3>
         
@@ -207,14 +207,14 @@ export default function PaymentMethodsForm({ onClose, onPaymentMethodAdded }: Pa
             {paymentMethods.map((method) => (
               <div
                 key={method.id}
-                className="flex items-center justify-between py-2 px-3 bg-gray-700/50 rounded-md"
+                className="flex items-center justify-between p-3 rounded-lg border border-card-border bg-card-bg"
               >
-                <span className="text-white">{method.name}</span>
+                <span>{method.name}</span>
                 <button
                   onClick={() => handleDeleteMethod(method.id)}
-                  className="text-gray-400 hover:text-red-400 p-1"
+                  className="Bolsillo App-icon-btn text-accent-red"
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}

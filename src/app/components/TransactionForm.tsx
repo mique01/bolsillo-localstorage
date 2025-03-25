@@ -42,12 +42,12 @@ type Settings = {
 };
 
 type TransactionFormProps = {
-  onClose: () => void;
-  onTransactionAdded: () => void;
-  editTransaction?: Transaction | null;
+  onSubmit: (transaction: Transaction) => void;
+  onCancel: () => void;
+  initialValues?: Transaction | null;
 };
 
-export default function TransactionForm({ onClose, onTransactionAdded, editTransaction }: TransactionFormProps) {
+export default function TransactionForm({ onSubmit, onCancel, initialValues }: TransactionFormProps) {
   const { user } = useAuth();
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -68,16 +68,16 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
 
   // Cargar los datos de la transacción si estamos editando
   useEffect(() => {
-    if (editTransaction) {
-      setDescription(editTransaction.description);
-      setAmount(editTransaction.amount.toString());
-      setDate(editTransaction.date);
-      setType(editTransaction.type);
-      setSelectedCategory(editTransaction.category);
-      setSelectedPaymentMethod(editTransaction.paymentMethod || '');
-      setSelectedPerson(editTransaction.person || '');
+    if (initialValues) {
+      setDescription(initialValues.description);
+      setAmount(initialValues.amount.toString());
+      setDate(initialValues.date);
+      setType(initialValues.type);
+      setSelectedCategory(initialValues.category);
+      setSelectedPaymentMethod(initialValues.paymentMethod || '');
+      setSelectedPerson(initialValues.person || '');
     }
-  }, [editTransaction]);
+  }, [initialValues]);
 
   useEffect(() => {
     if (!user) return;
@@ -110,8 +110,11 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
         (cat: Category) => cat.userId === user.id && cat.type === type
       );
       setCategories(userCategories);
-      // Resetear la categoría seleccionada cuando cambia el tipo
-      setSelectedCategory('');
+      
+      // Solo resetear la categoría si es un cambio de tipo y no estamos editando
+      if (!initialValues) {
+        setSelectedCategory('');
+      }
     }
     
     // Cargar métodos de pago
@@ -123,7 +126,11 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
         (method: PaymentMethod) => method.userId === user.id
       );
       setPaymentMethods(userPaymentMethods);
-      setSelectedPaymentMethod('');
+      
+      // Solo resetear el método de pago si no estamos editando
+      if (!initialValues) {
+        setSelectedPaymentMethod('');
+      }
     }
   };
 
@@ -152,36 +159,10 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
     setIsSaving(true);
 
     try {
-      // Obtener transacciones existentes
-      const storedTransactions = localStorage.getItem('transactions');
-      const existingTransactions = storedTransactions ? JSON.parse(storedTransactions) : [];
-      
       // Si estamos editando, actualizamos la transacción existente
-      if (editTransaction) {
-        const updatedTransactions = existingTransactions.map((t: Transaction) => {
-          if (t.id === editTransaction.id) {
-            return {
-              ...t,
-              description,
-              amount: parseFloat(amount),
-              date,
-              category: selectedCategory,
-              type,
-              paymentMethod: type === 'expense' ? selectedPaymentMethod : null,
-              person: (type === 'expense' && settings?.liveWithOthers && selectedPerson) ? selectedPerson : null
-            };
-          }
-          return t;
-        });
-        
-        // Guardar en localStorage
-        localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
-        setSuccess('Transacción actualizada correctamente');
-      } else {
-        // Crear nueva transacción
-        const newTransaction = {
-          id: Date.now().toString(),
-          userId: user.id,
+      if (initialValues) {
+        const updatedTransaction: Transaction = {
+          ...initialValues,
           description,
           amount: parseFloat(amount),
           date,
@@ -191,28 +172,27 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
           person: (type === 'expense' && settings?.liveWithOthers && selectedPerson) ? selectedPerson : null
         };
         
-        // Agregar nueva transacción
-        const updatedTransactions = [...existingTransactions, newTransaction];
+        onSubmit(updatedTransaction);
+        setSuccess('Transacción actualizada correctamente');
+      } else {
+        // Crear nueva transacción
+        const newTransaction: Omit<Transaction, 'id' | 'userId'> = {
+          description,
+          amount: parseFloat(amount),
+          date,
+          category: selectedCategory,
+          type,
+          paymentMethod: type === 'expense' ? selectedPaymentMethod : null,
+          person: (type === 'expense' && settings?.liveWithOthers && selectedPerson) ? selectedPerson : null
+        };
         
-        // Guardar en localStorage
-        localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+        // Enviar al componente padre
+        onSubmit(newTransaction as Transaction);
         setSuccess('Transacción guardada correctamente');
       }
       
       setTimeout(() => {
         setSuccess('');
-        // Resetear formulario
-        setDescription('');
-        setAmount('');
-        setDate(new Date().toISOString().split('T')[0]);
-        setType('expense');
-        setSelectedCategory('');
-        setSelectedPaymentMethod('');
-        setSelectedPerson('');
-        // Notificar al componente padre
-        onTransactionAdded();
-        // Cerrar formulario
-        onClose();
       }, 1500);
     } catch (err) {
       setError('Error al guardar la transacción');
@@ -233,121 +213,85 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
   };
 
   return (
-    <div className="relative bg-gray-800 rounded-lg p-6 border border-gray-700">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-medium text-white">
-          {editTransaction ? 'Editar Transacción' : 'Nueva Transacción'}
-        </h2>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-white"
-        >
-          <X size={24} />
-        </button>
-      </div>
-
+    <div className="relative">
       {error && (
-        <div className="mb-4 bg-red-900/30 border border-red-500/50 text-red-200 p-3 rounded-lg flex items-start gap-2">
-          <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
-          <p>{error}</p>
+        <div className="mb-4 p-3 rounded-lg flex items-start gap-2 bg-accent-red/10 border border-accent-red/20 text-accent-red">
+          <AlertCircle size={18} className="mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 bg-green-900/30 border border-green-500/50 text-green-200 p-3 rounded-lg flex items-start gap-2">
-          <Check size={18} className="mt-0.5 flex-shrink-0" />
-          <p>{success}</p>
+        <div className="mb-4 p-3 rounded-lg flex items-start gap-2 bg-accent-green/10 border border-accent-green/20 text-accent-green">
+          <Check size={18} className="mt-0.5" />
+          <span>{success}</span>
         </div>
       )}
 
-      {/* Formulario de categorías (condicional) */}
-      {showCategoryForm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <CategoryForm 
-              onClose={() => setShowCategoryForm(false)} 
-              onCategoryAdded={handleCategoryAdded}
-              initialType={type}
-            />
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Tipo de transacción */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setType('income')}
+            className={`p-3 rounded-lg border flex items-center justify-center transition-colors ${
+              type === 'income'
+                ? 'bg-green-100/10 border-green-500/40 text-green-400'
+                : 'border-gray-700 bg-gray-800 hover:bg-gray-700'
+            }`}
+          >
+            Ingreso
+          </button>
+          <button
+            type="button"
+            onClick={() => setType('expense')}
+            className={`p-3 rounded-lg border flex items-center justify-center transition-colors ${
+              type === 'expense'
+                ? 'bg-red-100/10 border-red-500/40 text-red-400'
+                : 'border-gray-700 bg-gray-800 hover:bg-gray-700'
+            }`}
+          >
+            Gasto
+          </button>
         </div>
-      )}
 
-      {/* Formulario de métodos de pago (condicional) */}
-      {showPaymentMethodForm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <PaymentMethodsForm 
-              onClose={() => setShowPaymentMethodForm(false)} 
-              onPaymentMethodAdded={handlePaymentMethodAdded}
-            />
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Descripción */}
         <div>
-          <label htmlFor="type" className="block text-sm font-medium text-gray-300 mb-1">
-            Tipo
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              className={`py-2 px-4 rounded-md flex justify-center items-center ${
-                type === 'expense'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-              onClick={() => setType('expense')}
-            >
-              Gasto
-            </button>
-            <button
-              type="button"
-              className={`py-2 px-4 rounded-md flex justify-center items-center ${
-                type === 'income'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-              onClick={() => setType('income')}
-            >
-              Ingreso
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="description" className="block text-sm font-medium mb-1">
             Descripción
           </label>
           <input
             type="text"
             id="description"
+            placeholder="Descripción de la transacción"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ej. Compra en supermercado"
+            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
           />
         </div>
 
+        {/* Monto */}
         <div>
-          <label htmlFor="amount" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="amount" className="block text-sm font-medium mb-1">
             Monto
           </label>
           <input
             type="number"
             id="amount"
+            placeholder="0.00"
+            min="0.01"
+            step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="0.00"
-            min="0"
-            step="0.01"
+            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
           />
         </div>
 
+        {/* Fecha */}
         <div>
-          <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="date" className="block text-sm font-medium mb-1">
             Fecha
           </label>
           <input
@@ -355,29 +299,32 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
             id="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
           />
         </div>
 
+        {/* Categoría */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label htmlFor="category" className="block text-sm font-medium text-gray-300">
-              {type === 'expense' ? 'Categoría de Gasto' : 'Categoría de Ingreso'}
+            <label htmlFor="category" className="block text-sm font-medium">
+              Categoría
             </label>
             <button
               type="button"
               onClick={() => setShowCategoryForm(true)}
-              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+              className="text-xs text-primary flex items-center"
             >
-              <Settings size={12} />
-              Gestionar
+              <PlusCircle size={14} className="mr-1" />
+              Nueva Categoría
             </button>
           </div>
           <select
             id="category"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="Bolsillo App-select"
+            required
           >
             <option value="">Selecciona una categoría</option>
             {categories.map((category) => (
@@ -388,79 +335,110 @@ export default function TransactionForm({ onClose, onTransactionAdded, editTrans
           </select>
         </div>
 
+        {/* Método de pago (solo para gastos) */}
         {type === 'expense' && (
-          <>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-300">
-                  Método de Pago
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentMethodForm(true)}
-                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                >
-                  <Settings size={12} />
-                  Gestionar
-                </button>
-              </div>
-              <select
-                id="paymentMethod"
-                value={selectedPaymentMethod}
-                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label htmlFor="paymentMethod" className="block text-sm font-medium">
+                Método de Pago
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPaymentMethodForm(true)}
+                className="text-xs text-primary flex items-center"
               >
-                <option value="">Selecciona un método de pago</option>
-                {paymentMethods.map((method) => (
-                  <option key={method.id} value={method.name}>
-                    {method.name}
+                <PlusCircle size={14} className="mr-1" />
+                Nuevo Método
+              </button>
+            </div>
+            <select
+              id="paymentMethod"
+              value={selectedPaymentMethod}
+              onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+              className="Bolsillo App-select"
+              required
+            >
+              <option value="">Selecciona un método de pago</option>
+              {paymentMethods.map((method) => (
+                <option key={method.id} value={method.name}>
+                  {method.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Selección de persona (solo para gastos y si vive con otras personas) */}
+        {type === 'expense' && settings?.liveWithOthers && people.length > 0 && (
+          <div>
+            <label htmlFor="person" className="block text-sm font-medium mb-1">
+              Pagado por
+            </label>
+            <div className="flex items-center">
+              <select
+                id="person"
+                value={selectedPerson}
+                onChange={(e) => setSelectedPerson(e.target.value)}
+                className="Bolsillo App-select"
+              >
+                <option value="">Sin asignar</option>
+                {people.map((person) => (
+                  <option key={person} value={person}>
+                    {person}
                   </option>
                 ))}
               </select>
-            </div>
-
-            {settings?.liveWithOthers && people.length > 0 && (
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label htmlFor="person" className="block text-sm font-medium text-gray-300">
-                    Persona que Realizó el Gasto
-                  </label>
-                </div>
-                <select
-                  id="person"
-                  value={selectedPerson}
-                  onChange={(e) => setSelectedPerson(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecciona una persona</option>
-                  {people.map((person, index) => (
-                    <option key={index} value={person}>
-                      {person}
-                    </option>
-                  ))}
-                </select>
+              <div className="ml-2">
+                <User size={18} className="text-gray-400" />
               </div>
-            )}
-          </>
+            </div>
+          </div>
         )}
 
-        <div className="pt-2">
+        {/* Botones */}
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+            disabled={isSaving}
+          >
+            Cancelar
+          </button>
           <button
             type="submit"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
             disabled={isSaving}
-            className="w-full flex justify-center items-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
           >
-            {isSaving ? (
-              <span>Guardando...</span>
-            ) : (
-              <>
-                <PlusCircle size={18} />
-                <span>Guardar {type === 'expense' ? 'Gasto' : 'Ingreso'}</span>
-              </>
-            )}
+            {isSaving ? 'Guardando...' : initialValues ? 'Actualizar' : 'Guardar'}
           </button>
         </div>
       </form>
+
+      {/* Modal de categorías */}
+      {showCategoryForm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <CategoryForm 
+              onClose={() => setShowCategoryForm(false)} 
+              onCategoryAdded={handleCategoryAdded} 
+              initialType={type}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de métodos de pago */}
+      {showPaymentMethodForm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <PaymentMethodsForm 
+              onClose={() => setShowPaymentMethodForm(false)} 
+              onPaymentMethodAdded={handlePaymentMethodAdded}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
