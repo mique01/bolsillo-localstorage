@@ -4,15 +4,18 @@
 const isGitHubPages = process.env.GITHUB_ACTIONS === 'true';
 const isVercel = process.env.VERCEL === '1';
 
+// Nombre del repositorio para GitHub Pages
+const repoName = 'bolsilloapp-localstorage';
+
 // Configuración específica para GitHub Pages
 const githubPagesConfig = {
-  output: 'export', // Generar archivos estáticos
+  output: process.env.GITHUB_ACTIONS === 'true' ? 'export' : undefined, // Generar archivos estáticos solo en GitHub Actions
   images: {
     unoptimized: true, // No optimizar imágenes para evitar problemas con rutas
   },
   trailingSlash: true, // Añadir barras al final para compatibilidad con GitHub Pages
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/bolsilloapp-localstorage' : '', // Ajustar según el nombre de tu repo
-  basePath: process.env.NODE_ENV === 'production' ? '/bolsilloapp-localstorage' : '',
+  assetPrefix: process.env.NODE_ENV === 'production' ? `/${repoName}` : '', // Ajustar según el nombre de tu repo
+  basePath: process.env.NODE_ENV === 'production' ? `/${repoName}` : '',
   distDir: 'out', // Directorio de salida para la compilación
 };
 
@@ -76,5 +79,9 @@ nextConfig.onDemandEntries = {
   maxInactiveAge: 25 * 1000,
   pagesBufferLength: 5,
 };
+
+console.log('Building with configuration:', isGitHubPages ? 'GitHub Pages' : 'Standard');
+console.log('Output mode:', nextConfig.output || 'server');
+console.log('Base path:', nextConfig.basePath || 'none');
 
 module.exports = nextConfig; 

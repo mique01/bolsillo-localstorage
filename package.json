@@ -10,13 +10,14 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/fix-duplicated-paths.js",
+    "postbuild": "node scripts/fix-duplicated-paths.js && node scripts/fix-github-pages.js",
     "start": "next start -p 3002",
     "clean": "rm -rf .next && rm -rf out && rm -rf node_modules/.cache",
     "lint": "next lint",
     "export": "next export",
-    "deploy": "next build && touch out/.nojekyll && git add out/ && git commit -m \"Deploy to gh-pages\" && git subtree push --prefix out origin gh-pages",
-    "analyze": "ANALYZE=true next build"
+    "deploy": "next build && git add out/ && git commit -m \"Deploy to gh-pages\" && git subtree push --prefix out origin gh-pages",
+    "analyze": "ANALYZE=true next build",
+    "prepare-gh-pages": "node scripts/fix-github-pages.js"
   },
   "resolutions": {
     "string-width": "4.2.3",
