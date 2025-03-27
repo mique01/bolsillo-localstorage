@@ -23,42 +23,27 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies 📦
-        run: |
-          npm ci
-          npm install -g next
+        run: npm ci
 
-      # Modify the Next.js config to work in static export mode
-      - name: Configure for static export
+      - name: Set environment variables
         run: |
-          cat > next.config.static.js << EOL
-          /** @type {import('next').NextConfig} */
-          
-          const repoName = 'bolsilloapp-localstorage';
-          
-          const nextConfig = {
-            output: 'export',
-            images: {
-              unoptimized: true,
-            },
-            trailingSlash: true,
-            assetPrefix: "/${repoName}/",
-            basePath: "/${repoName}",
-            webpack: (config) => {
-              return config;
-            }
-          };
-          
-          module.exports = nextConfig;
-          EOL
-          
-          mv next.config.static.js next.config.js
-          cat next.config.js
+          echo "GITHUB_ACTIONS=true" >> $GITHUB_ENV
+          echo "NODE_ENV=production" >> $GITHUB_ENV
 
-      - name: Build 🔧
+      - name: Create .env.local file
         run: |
+          touch .env.local
           echo "GITHUB_ACTIONS=true" >> .env.local
           echo "NODE_ENV=production" >> .env.local
-          npm run build
+          if [ -f .env.example ]; then
+            cat .env.example >> .env.local
+          fi
+          if [ -f .env ]; then
+            cat .env >> .env.local
+          fi
+
+      - name: Build 🔧
+        run: npm run build
         env:
           GITHUB_ACTIONS: 'true'
           NODE_ENV: 'production'

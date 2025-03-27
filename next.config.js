@@ -3,38 +3,60 @@
 // Determinar si estamos construyendo para GitHub Pages o Vercel
 const isGitHubPages = process.env.GITHUB_ACTIONS === 'true';
 const isVercel = process.env.VERCEL === '1';
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Nombre del repositorio para GitHub Pages
 const repoName = 'bolsilloapp-localstorage';
 
-// Configuración específica para GitHub Pages
-const githubPagesConfig = {
-  output: process.env.GITHUB_ACTIONS === 'true' ? 'export' : undefined, // Generar archivos estáticos solo en GitHub Actions
-  images: {
-    unoptimized: true, // No optimizar imágenes para evitar problemas con rutas
-  },
-  trailingSlash: true, // Añadir barras al final para compatibilidad con GitHub Pages
-  assetPrefix: process.env.NODE_ENV === 'production' ? `/${repoName}` : '', // Ajustar según el nombre de tu repo
-  basePath: process.env.NODE_ENV === 'production' ? `/${repoName}` : '',
-  distDir: 'out', // Directorio de salida para la compilación
-};
+// Determinar si debemos usar 'export' (para GitHub Pages) o 'standalone' (para Vercel)
+const outputMode = isGitHubPages ? 'export' : undefined;
 
-// Configuración estándar para Vercel o desarrollo local
-const standardConfig = {
-  // Opciones estándar
+// Configuración común para producción
+const productionConfig = {
+  // Configuración común para todos los entornos de producción
   reactStrictMode: false,
   swcMinify: true,
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
 };
 
-// Aplicar la configuración correcta según el entorno
-const nextConfig = isGitHubPages
-  ? { ...standardConfig, ...githubPagesConfig }
-  : standardConfig;
+// Configuración específica para GitHub Pages
+const githubPagesConfig = {
+  ...productionConfig,
+  output: 'export', // Siempre generar archivos estáticos para GitHub Pages
+  images: {
+    unoptimized: true, // No optimizar imágenes para GitHub Pages
+  },
+  trailingSlash: true, // Añadir barras al final para compatibilidad con GitHub Pages
+  assetPrefix: `/${repoName}`, // Ajustar según el nombre de tu repo
+  basePath: `/${repoName}`,    // Debe coincidir con el nombre del repositorio
+  distDir: 'out',              // Directorio de salida para la compilación
+};
 
-// Configuración de webpack para ambos entornos
+// Configuración para Vercel
+const vercelConfig = {
+  ...productionConfig,
+  // Vercel maneja automáticamente la configuración
+};
+
+// Configuración para desarrollo local
+const developmentConfig = {
+  reactStrictMode: false,
+  swcMinify: true,
+};
+
+// Elegir la configuración adecuada según el entorno
+let nextConfig;
+if (isGitHubPages) {
+  nextConfig = githubPagesConfig;
+  console.log('Using GitHub Pages configuration');
+} else if (isVercel) {
+  nextConfig = vercelConfig;
+  console.log('Using Vercel configuration');
+} else {
+  nextConfig = developmentConfig;
+  console.log('Using development configuration');
+}
+
+// Configuración de webpack para todos los entornos
 nextConfig.webpack = (config, { isServer }) => {
   if (!isServer) {
     // Polyfills para browser APIs no disponibles en Node
@@ -74,13 +96,9 @@ nextConfig.webpack = (config, { isServer }) => {
   return config;
 };
 
-// Manejo de errores en tiempo de construcción
-nextConfig.onDemandEntries = {
-  maxInactiveAge: 25 * 1000,
-  pagesBufferLength: 5,
-};
-
-console.log('Building with configuration:', isGitHubPages ? 'GitHub Pages' : 'Standard');
+console.log('Build environment:', process.env.NODE_ENV);
+console.log('Build for GitHub Pages:', isGitHubPages);
+console.log('Build for Vercel:', isVercel);
 console.log('Output mode:', nextConfig.output || 'server');
 console.log('Base path:', nextConfig.basePath || 'none');
 
